@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AutoMecanic.Api/AutoMecanic.Api.csproj" />
+    <Project Path="src/AutoMecanic.Application/AutoMecanic.Application.csproj" />
+    <Project Path="src/AutoMecanic.Domain/AutoMecanic.Domain.csproj" />
+    <Project Path="src/AutoMecanic.Infrastructure/AutoMecanic.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/AutoMecanic.IntegrationTests/AutoMecanic.IntegrationTests.csproj" />
+    <Project Path="tests/AutoMecanic.UnitTests/AutoMecanic.UnitTests.csproj" />
+  </Folder>
+</Solution>

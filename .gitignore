@@ -1,0 +1,40 @@
+## Build
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+TestResults/
+coverage/
+*.coverage
+*.coverlet.json
+coverage.*.json
+*.trx
+
+## IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+*.DotSettings.user
+
+## OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+## Segredos e ambiente
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+*.pfx
+*.snk
+secrets.json
+
+## Ferramentas
+.sonarqube/
+BenchmarkDotNet.Artifacts/

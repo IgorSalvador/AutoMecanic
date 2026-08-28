@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>AutoMecanic.Domain</RootNamespace>
+  </PropertyGroup>
+
+  <!--
+    A camada de Domínio é deliberadamente livre de dependências de infraestrutura.
+    Nenhum PackageReference é adicionado aqui: o modelo de domínio é POCO puro.
+  -->
+
+</Project>

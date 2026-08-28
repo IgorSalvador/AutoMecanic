@@ -1,0 +1,19 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>nullable</WarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Company>AutoMecanic</Company>
+    <Product>Sistema Integrado de Atendimento e Execução de Serviços</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+</Project>
