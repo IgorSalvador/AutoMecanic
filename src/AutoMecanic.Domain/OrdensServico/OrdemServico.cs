@@ -334,6 +334,19 @@ public sealed class OrdemServico : AggregateRoot
         item.MarcarComoReservada();
     }
 
+    /// <summary>
+    /// Marca que a reserva do item foi desfeita no estoque. Chamado no cancelamento e na
+    /// reprovação do orçamento, para que a OS não fique alegando reservas que já não existem.
+    /// Não há guarda de status: liberar reserva é justamente o que se faz em uma OS encerrada.
+    /// </summary>
+    public void ConfirmarLiberacaoDeReservaDePeca(Guid itemPecaId)
+    {
+        var item = _itensPeca.FirstOrDefault(i => i.Id == itemPecaId)
+            ?? throw new DomainException("ITEM_NAO_ENCONTRADO", "Item de peça não encontrado na Ordem de Serviço.");
+
+        item.MarcarComoLiberada();
+    }
+
     /// <summary>Remove um item de serviço da OS.</summary>
     public void RemoverServico(Guid itemServicoId)
     {
