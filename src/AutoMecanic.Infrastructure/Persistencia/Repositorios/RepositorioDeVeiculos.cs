@@ -52,10 +52,17 @@ public sealed class RepositorioDeVeiculos(AutoMecanicDbContext contexto)
 
         if (PrepararTermo(termoDeBusca) is { } termo)
         {
-            consulta = consulta.Where(v =>
-                EF.Functions.ILike(EF.Property<string>(v, "placa"), termo)
-                || EF.Functions.ILike(v.Marca, termo)
-                || EF.Functions.ILike(v.Modelo, termo));
+            // Marca e modelo aceitam busca parcial. A placa é Objeto de Valor gravado por
+            // conversor e só admite igualdade — o que basta, porque quem busca por placa
+            // sempre tem a placa inteira em mãos.
+            consulta = Placa.TentarCriar(termoDeBusca, out var placa)
+                ? consulta.Where(v =>
+                    EF.Functions.ILike(v.Marca, termo)
+                    || EF.Functions.ILike(v.Modelo, termo)
+                    || v.Placa == placa)
+                : consulta.Where(v =>
+                    EF.Functions.ILike(v.Marca, termo)
+                    || EF.Functions.ILike(v.Modelo, termo));
         }
 
         return await PaginarAsync(

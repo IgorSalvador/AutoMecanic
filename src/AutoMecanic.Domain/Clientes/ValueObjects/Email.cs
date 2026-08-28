@@ -38,6 +38,21 @@ public sealed partial class Email : ValueObject
         return new Email(normalizado);
     }
 
+    /// <summary>Tentativa não-excepcional de criação, útil em filtros de consulta.</summary>
+    public static bool TentarCriar(string? entrada, out Email? email)
+    {
+        try
+        {
+            email = Criar(entrada);
+            return true;
+        }
+        catch (DomainException)
+        {
+            email = null;
+            return false;
+        }
+    }
+
     protected override IEnumerable<object?> ObterComponentesDeIgualdade()
     {
         yield return Endereco;

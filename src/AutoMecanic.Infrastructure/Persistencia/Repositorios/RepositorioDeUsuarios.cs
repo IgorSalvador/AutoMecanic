@@ -1,5 +1,6 @@
 using AutoMecanic.Application.Abstractions;
 using AutoMecanic.Application.Common;
+using AutoMecanic.Domain.Clientes.ValueObjects;
 using AutoMecanic.Domain.Identidade;
 using Microsoft.EntityFrameworkCore;
 
@@ -11,11 +12,15 @@ public sealed class RepositorioDeUsuarios(AutoMecanicDbContext contexto)
 {
     public async Task<Usuario?> ObterPorEmailAsync(string email, CancellationToken cancellationToken = default)
     {
-        var normalizado = (email ?? string.Empty).Trim().ToLowerInvariant();
+        // Um e-mail sintaticamente inválido não pode existir na base — o Objeto de Valor
+        // impede isso na escrita. Retornar nulo sem consultar evita uma ida ao banco e
+        // mantém a resposta de login idêntica à de "senha incorreta".
+        if (!Email.TentarCriar(email, out var enderecoValido))
+        {
+            return null;
+        }
 
-        return await Conjunto.FirstOrDefaultAsync(
-            u => EF.Property<string>(u, "email") == normalizado,
-            cancellationToken);
+        return await Conjunto.FirstOrDefaultAsync(u => u.Email == enderecoValido, cancellationToken);
     }
 
     public async Task<bool> ExisteComEmailAsync(
@@ -23,10 +28,13 @@ public sealed class RepositorioDeUsuarios(AutoMecanicDbContext contexto)
         Guid? ignorarId = null,
         CancellationToken cancellationToken = default)
     {
-        var normalizado = (email ?? string.Empty).Trim().ToLowerInvariant();
+        if (!Email.TentarCriar(email, out var enderecoValido))
+        {
+            return false;
+        }
 
         return await Conjunto.AnyAsync(
-            u => EF.Property<string>(u, "email") == normalizado && (ignorarId == null || u.Id != ignorarId),
+            u => u.Email == enderecoValido && (ignorarId == null || u.Id != ignorarId),
             cancellationToken);
     }
 
@@ -54,9 +62,9 @@ public sealed class RepositorioDeUsuarios(AutoMecanicDbContext contexto)
 
         if (PrepararTermo(termoDeBusca) is { } termo)
         {
-            consulta = consulta.Where(u =>
-                EF.Functions.ILike(u.Nome, termo)
-                || EF.Functions.ILike(EF.Property<string>(u, "email"), termo));
+            consulta = Email.TentarCriar(termoDeBusca, out var email)
+                ? consulta.Where(u => EF.Functions.ILike(u.Nome, termo) || u.Email == email)
+                : consulta.Where(u => EF.Functions.ILike(u.Nome, termo));
         }
 
         return await PaginarAsync(consulta.OrderBy(u => u.Nome), paginacao, cancellationToken);

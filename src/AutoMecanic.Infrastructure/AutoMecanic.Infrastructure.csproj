@@ -18,6 +18,11 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
   </ItemGroup>
 
+  <!-- Migrações são geradas pelas ferramentas do EF Core; o estilo delas não é nosso. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);IDE0161</NoWarn>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\AutoMecanic.Application\AutoMecanic.Application.csproj" />
   </ItemGroup>

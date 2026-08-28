@@ -20,6 +20,10 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// O Kestrel escreve o cabeçalho "Server: Kestrel" no momento do flush, depois de qualquer
+// middleware. Desligá-lo na origem é a única forma de a resposta não anunciar o servidor.
+builder.WebHost.ConfigureKestrel(opcoes => opcoes.AddServerHeader = false);
+
 // ---------------------------------------------------------------------------
 // Registro estruturado. Console em JSON facilita a coleta por agregadores de log
 // em contêiner, sem depender de arquivo em disco.

@@ -1,6 +1,7 @@
 using AutoMecanic.Application.Abstractions;
 using AutoMecanic.Application.Common;
 using AutoMecanic.Domain.OrdensServico;
+using AutoMecanic.Domain.OrdensServico.ValueObjects;
 using Microsoft.EntityFrameworkCore;
 
 namespace AutoMecanic.Infrastructure.Persistencia.Repositorios;
@@ -17,10 +18,14 @@ public sealed class RepositorioDeOrdensServico(AutoMecanicDbContext contexto)
     public async Task<OrdemServico?> ObterCompletaPorIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await Conjunto.FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
 
-    public async Task<OrdemServico?> ObterPorNumeroAsync(string numero, CancellationToken cancellationToken = default) =>
-        await Conjunto.FirstOrDefaultAsync(
-            o => EF.Property<string>(o, "numero") == numero,
-            cancellationToken);
+    public async Task<OrdemServico?> ObterPorNumeroAsync(string numero, CancellationToken cancellationToken = default)
+    {
+        // O número é Objeto de Valor gravado por conversor: a comparação é feita sobre o
+        // próprio VO, e o provedor traduz para a coluna de texto correspondente.
+        var numeroValidado = NumeroOrdemServico.Analisar(numero);
+
+        return await Conjunto.FirstOrDefaultAsync(o => o.Numero == numeroValidado, cancellationToken);
+    }
 
     public async Task<ResultadoPaginado<OrdemServico>> ListarAsync(
         StatusOrdemServico? status,

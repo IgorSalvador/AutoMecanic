@@ -38,16 +38,40 @@ public sealed class RepositorioDeClientes(AutoMecanicDbContext contexto)
             consulta = consulta.Where(c => c.Ativo == ativo);
         }
 
-        if (PrepararTermo(termoDeBusca) is { } termo)
-        {
-            // ILIKE é a busca sem distinção de maiúsculas do PostgreSQL; o termo é
-            // parametrizado pelo EF, portanto não há superfície para injeção de SQL.
-            consulta = consulta.Where(c =>
-                EF.Functions.ILike(c.Nome, termo)
-                || EF.Functions.ILike(EF.Property<string>(c, "documento"), termo)
-                || EF.Functions.ILike(EF.Property<string>(c, "email"), termo));
-        }
+        consulta = AplicarBusca(consulta, termoDeBusca);
 
         return await PaginarAsync(consulta.OrderBy(c => c.Nome), paginacao, cancellationToken);
+    }
+
+    /// <summary>
+    /// Aplica a busca livre.
+    /// <para>
+    /// O nome é uma coluna de texto comum e aceita <c>ILIKE</c> (busca parcial, sem
+    /// distinção de maiúsculas). Documento e e-mail são Objetos de Valor gravados por
+    /// conversor: para o banco são colunas de texto, mas para o LINQ são tipos opacos, e o
+    /// provedor não consegue traduzir uma comparação parcial sobre eles.
+    /// </para>
+    /// <para>
+    /// A saída é comparar esses dois por <b>igualdade do próprio Objeto de Valor</b>, quando
+    /// o termo digitado for um documento ou e-mail válido. Na prática é o comportamento que
+    /// o atendente espera: busca-se um CPF inteiro, não um pedaço dele.
+    /// </para>
+    /// </summary>
+    private static IQueryable<Cliente> AplicarBusca(IQueryable<Cliente> consulta, string? termoDeBusca)
+    {
+        if (PrepararTermo(termoDeBusca) is not { } termo)
+        {
+            return consulta;
+        }
+
+        var achouDocumento = Documento.TentarCriar(termoDeBusca, out var documento);
+        var achouEmail = Email.TentarCriar(termoDeBusca, out var email);
+
+        return (achouDocumento, achouEmail) switch
+        {
+            (true, _) => consulta.Where(c => EF.Functions.ILike(c.Nome, termo) || c.Documento == documento),
+            (_, true) => consulta.Where(c => EF.Functions.ILike(c.Nome, termo) || c.Email == email),
+            _ => consulta.Where(c => EF.Functions.ILike(c.Nome, termo))
+        };
     }
 }
