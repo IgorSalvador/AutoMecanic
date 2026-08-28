@@ -28,11 +28,25 @@ public abstract class RepositorioBase<TAgregado>(AutoMecanicDbContext contexto) 
     public virtual async Task AdicionarAsync(TAgregado agregado, CancellationToken cancellationToken = default) =>
         await Conjunto.AddAsync(agregado, cancellationToken);
 
+    /// <summary>
+    /// Marca o agregado como alterado.
+    /// <para>
+    /// Quando ele já está sendo rastreado — o caso normal, porque o caso de uso o carregou
+    /// pelo próprio repositório — nada é feito: o rastreador de mudanças do EF Core já
+    /// detecta as alterações no commit. Chamar <c>Update</c> aqui marcaria <b>todas</b> as
+    /// propriedades como modificadas, inclusive as das entidades filhas, produzindo UPDATEs
+    /// desnecessários e interferindo no token de concorrência.
+    /// </para>
+    /// <para>
+    /// O <c>Update</c> só é necessário para um agregado desanexado, vindo de fora do contexto.
+    /// </para>
+    /// </summary>
     public virtual void Atualizar(TAgregado agregado)
     {
-        // O agregado normalmente já está rastreado; Update é chamado apenas para tornar a
-        // intenção explícita no código do caso de uso.
-        Conjunto.Update(agregado);
+        if (Contexto.Entry(agregado).State == EntityState.Detached)
+        {
+            Conjunto.Update(agregado);
+        }
     }
 
     public virtual void Remover(TAgregado agregado) => Conjunto.Remove(agregado);

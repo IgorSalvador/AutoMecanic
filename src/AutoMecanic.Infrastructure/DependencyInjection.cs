@@ -26,10 +26,17 @@ public static class DependencyInjection
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var cadeiaDeConexao = configuration.GetConnectionString(NomeDaConexao)
-            ?? throw new InvalidOperationException(
+        var cadeiaDeConexao = configuration.GetConnectionString(NomeDaConexao);
+
+        // A verificação é por conteúdo, e não apenas por nulo: o appsettings.json declara a
+        // chave com string vazia para documentar sua existência, e uma cadeia vazia produziria
+        // um erro do driver difícil de diagnosticar em vez desta mensagem.
+        if (string.IsNullOrWhiteSpace(cadeiaDeConexao))
+        {
+            throw new InvalidOperationException(
                 $"A cadeia de conexão '{NomeDaConexao}' não foi configurada. "
                 + "Defina ConnectionStrings__PostgreSQL nas variáveis de ambiente.");
+        }
 
         services.AddDbContext<AutoMecanicDbContext>(opcoes =>
         {
