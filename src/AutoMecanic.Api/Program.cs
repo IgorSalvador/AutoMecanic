@@ -134,6 +134,12 @@ builder.Services.AddAuthorization(opcoes =>
 // ---------------------------------------------------------------------------
 // Limitação de taxa
 // ---------------------------------------------------------------------------
+// Os limites são configuração de ambiente, não regra de negócio: um ambiente de teste
+// automatizado dispara centenas de requisições por minuto de um único endereço, e reduzir
+// o valor em produção não deveria exigir recompilação.
+var limiteDeLogin = builder.Configuration.GetValue("LimiteDeTaxa:LoginPorMinuto", 10);
+var limiteGlobal = builder.Configuration.GetValue("LimiteDeTaxa:GlobalPorMinuto", 300);
+
 builder.Services.AddRateLimiter(opcoes =>
 {
     opcoes.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -144,7 +150,7 @@ builder.Services.AddRateLimiter(opcoes =>
         partitionKey: contexto.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 10,
+            PermitLimit = limiteDeLogin,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         }));
@@ -155,7 +161,7 @@ builder.Services.AddRateLimiter(opcoes =>
             partitionKey: contexto.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
             factory: _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 300,
+                PermitLimit = limiteGlobal,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             }));

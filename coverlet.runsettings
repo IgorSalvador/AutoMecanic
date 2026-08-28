@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura,opencover</Format>
+
+          <!--
+            Os domínios críticos são Domain e Application: é neles que vive a regra de
+            negócio e é sobre eles que o requisito exige 80% de cobertura. Infrastructure
+            e Api são exercitados pelos testes de integração contra banco e HTTP reais.
+          -->
+          <Include>[AutoMecanic.Domain]*,[AutoMecanic.Application]*,[AutoMecanic.Infrastructure]*,[AutoMecanic.Api]*</Include>
+
+          <!--
+            Exclusões: código gerado por ferramenta (migrações do EF Core) e o ponto de
+            entrada, que é composição de serviços e não tem regra a ser verificada.
+          -->
+          <Exclude>[*]AutoMecanic.Infrastructure.Persistencia.Migracoes.*,[*]Program</Exclude>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
+          <ExcludeByFile>**/Migracoes/*.cs</ExcludeByFile>
+
+          <SingleHit>false</SingleHit>
+          <UseSourceLink>true</UseSourceLink>
+          <IncludeTestAssembly>false</IncludeTestAssembly>
+          <SkipAutoProps>true</SkipAutoProps>
+          <DeterministicReport>false</DeterministicReport>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>

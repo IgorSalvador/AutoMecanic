@@ -1,5 +1,4 @@
 using AutoMecanic.Api.Configuracao;
-using AutoMecanic.Application.Abstractions;
 using AutoMecanic.Application.Common;
 using AutoMecanic.Application.Identidade;
 using AutoMecanic.Application.Identidade.Dtos;
@@ -16,7 +15,7 @@ namespace AutoMecanic.Api.Controllers;
 [Authorize(Policy = PoliticasDeAutorizacao.Administrar)]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
-public sealed class UsuariosController(IServicoDeUsuarios servico, IUsuarioAtual usuarioAtual) : ControllerBase
+public sealed class UsuariosController(IServicoDeUsuarios servico) : ControllerBase
 {
     /// <summary>Cria um usuário administrativo.</summary>
     /// <param name="requisicao">Nome, e-mail, senha inicial e perfil.</param>
@@ -47,22 +46,6 @@ public sealed class UsuariosController(IServicoDeUsuarios servico, IUsuarioAtual
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<UsuarioResponse>> ObterPorId(Guid id, CancellationToken cancellationToken) =>
         Ok(await servico.ObterPorIdAsync(id, cancellationToken));
-
-    /// <summary>Dados do usuário autenticado na requisição corrente.</summary>
-    /// <param name="cancellationToken">Token de cancelamento.</param>
-    /// <response code="200">Perfil do usuário autenticado.</response>
-    /// <response code="401">Requisição sem token válido.</response>
-    /// <remarks>Acessível a qualquer usuário autenticado, independentemente do perfil.</remarks>
-    [HttpGet("eu")]
-    [Authorize(Policy = PoliticasDeAutorizacao.Consultar)]
-    [ProducesResponseType<UsuarioResponse>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<UsuarioResponse>> ObterUsuarioAtual(CancellationToken cancellationToken)
-    {
-        var id = usuarioAtual.Id
-            ?? throw new NaoAutorizadoException("Token sem identificação de usuário.");
-
-        return Ok(await servico.ObterPorIdAsync(id, cancellationToken));
-    }
 
     /// <summary>Lista usuários com filtro e paginação.</summary>
     /// <param name="termoDeBusca">Texto livre aplicado a nome e e-mail.</param>
@@ -97,33 +80,6 @@ public sealed class UsuariosController(IServicoDeUsuarios servico, IUsuarioAtual
         [FromBody] AtualizarUsuarioRequest requisicao,
         CancellationToken cancellationToken) =>
         Ok(await servico.AtualizarAsync(id, requisicao, cancellationToken));
-
-    /// <summary>Troca a própria senha.</summary>
-    /// <param name="requisicao">Senha atual e nova senha.</param>
-    /// <param name="cancellationToken">Token de cancelamento.</param>
-    /// <response code="204">Senha alterada.</response>
-    /// <response code="400">Nova senha fora da política.</response>
-    /// <response code="422">Senha atual incorreta ou nova senha igual à anterior.</response>
-    /// <remarks>
-    /// Exige a senha atual como prova de identidade: sem isso, um token roubado permitiria
-    /// tomar a conta permanentemente.
-    /// </remarks>
-    [HttpPost("eu/senha")]
-    [Authorize(Policy = PoliticasDeAutorizacao.Consultar)]
-    [ProducesResponseType(StatusCodes.Status204NoContent)]
-    [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
-    public async Task<IActionResult> AlterarPropriaSenha(
-        [FromBody] AlterarSenhaRequest requisicao,
-        CancellationToken cancellationToken)
-    {
-        var id = usuarioAtual.Id
-            ?? throw new NaoAutorizadoException("Token sem identificação de usuário.");
-
-        await servico.AlterarSenhaAsync(id, requisicao, cancellationToken);
-
-        return NoContent();
-    }
 
     /// <summary>Redefine a senha de um usuário.</summary>
     /// <param name="id">Identificador do usuário.</param>
