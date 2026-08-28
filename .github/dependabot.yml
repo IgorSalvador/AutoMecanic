@@ -1,0 +1,63 @@
+# Atualização automática de dependências.
+#
+# É o complemento operacional do que o relatório de segurança verifica pontualmente:
+# a varredura do CI acusa uma dependência vulnerável depois que ela entra; o Dependabot
+# abre a atualização antes disso.
+
+version: 2
+
+updates:
+  # Pacotes NuGet. Como a solução usa gestão central de versões, o Dependabot altera
+  # apenas o Directory.Packages.props — um arquivo, uma revisão.
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'chore(deps)'
+    labels:
+      - dependências
+    groups:
+      # Os pacotes da Microsoft saem em lote a cada correção do runtime; agrupá-los
+      # evita cinco revisões para a mesma atualização.
+      microsoft:
+        patterns:
+          - 'Microsoft.*'
+          - 'System.*'
+      testes:
+        patterns:
+          - 'xunit*'
+          - 'Shouldly'
+          - 'NSubstitute'
+          - 'Testcontainers*'
+          - 'coverlet*'
+          - 'Respawn'
+
+  # Imagem base do contêiner. É de onde vieram as únicas vulnerabilidades encontradas
+  # na análise, então acompanhar as atualizações aqui tem efeito direto no relatório.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '09:00'
+      timezone: America/Sao_Paulo
+    commit-message:
+      prefix: 'chore(docker)'
+    labels:
+      - dependências
+      - segurança
+
+  # Ações usadas no pipeline de CI.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: 'chore(ci)'
+    labels:
+      - dependências

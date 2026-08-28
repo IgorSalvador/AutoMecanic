@@ -5,8 +5,11 @@
 ### de cima para baixo.
 ###
 ### Como executar:
-###   · VS Code  — extensão "REST Client" (humao.rest-client), clique em "Send Request"
-###   · Visual Studio / Rider — suporte nativo a arquivos .http
+###   · VS Code — extensão "REST Client" (humao.rest-client), clique em "Send Request".
+###     É a única que resolve as referências entre requisições ({{nome.response.body.$.campo}}),
+###     usadas aqui para encadear o token e os identificadores gerados.
+###   · Visual Studio / Rider — executam as requisições, mas não encadeiam respostas:
+###     nessas ferramentas, copie manualmente o token e os ids para as variáveis do topo.
 ###
 ### Pré-requisito: `docker compose up -d --build` e a API saudável em localhost:8080.
 
@@ -61,7 +64,7 @@ Content-Type: application/json
   "senha": "{{senhaAdmin}}"
 }
 
-@token = {{login.response.body.token}}
+@token = {{login.response.body.$.token}}
 
 ### 1.4 · Perfil do usuário autenticado
 # O hash da senha não aparece na resposta — o DTO simplesmente não tem esse campo.
@@ -118,14 +121,14 @@ Content-Type: application/json
 GET {{api}}/servicos?apenasAtivos=true&tamanhoPagina=5
 Authorization: Bearer {{token}}
 
-@servicoId = {{servicos.response.body.itens[0].id}}
+@servicoId = {{servicos.response.body.$.itens[0].id}}
 
 ### 3.2 · Peças, com os três saldos decompostos
 # @name pecas
 GET {{api}}/pecas?apenasAtivas=true&tamanhoPagina=5
 Authorization: Bearer {{token}}
 
-@pecaId = {{pecas.response.body.itens[0].id}}
+@pecaId = {{pecas.response.body.$.itens[0].id}}
 
 ### 3.3 · Peças no ponto de ressuprimento, com sugestão de compra
 GET {{api}}/pecas/alertas
@@ -169,8 +172,8 @@ Content-Type: application/json
   "quilometragemEntrada": 42000
 }
 
-@osId = {{recepcao.response.body.id}}
-@osNumero = {{recepcao.response.body.numero}}
+@osId = {{recepcao.response.body.$.id}}
+@osNumero = {{recepcao.response.body.$.numero}}
 
 
 ### ────────────────────────────────────────────────────────────────────────────
@@ -348,7 +351,7 @@ Content-Type: application/json
   "quilometragemEntrada": 45000
 }
 
-@segundaOsId = {{segundaOs.response.body.id}}
+@segundaOsId = {{segundaOs.response.body.$.id}}
 
 ### 11.2 · Diagnóstico
 POST {{api}}/ordens-servico/{{segundaOsId}}/diagnostico/iniciar
@@ -466,7 +469,7 @@ Content-Type: application/json
   "senha": "Mecanico@2026"
 }
 
-@tokenMecanico = {{loginMecanico.response.body.token}}
+@tokenMecanico = {{loginMecanico.response.body.$.token}}
 
 ### 14.3 · Mecânico consultando OS → 200 (política "Consultar")
 GET {{api}}/ordens-servico?tamanhoPagina=5
