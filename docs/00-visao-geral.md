@@ -17,6 +17,8 @@ Os documentos foram escritos para serem lidos nesta ordem, do vocabulário ao c�
 | 4 | **[Modelo de Domínio](04-modelo-de-dominio.md)** | *Quais são os agregados, e por que as fronteiras estão onde estão?* | ~15 min |
 | 5 | **[Arquitetura](05-arquitetura.md)** | *Como o código está organizado, e o que cada decisão custou?* | ~12 min |
 | 6 | **[Relatório de segurança](06-relatorio-de-seguranca.md)** | *O sistema é seguro? Como isso foi verificado?* | ~12 min |
+| 7 | **[Roteiro do vídeo](07-roteiro-do-video.md)** | *Como demonstrar tudo isso em 15 minutos?* | ~5 min |
+| — | **[Documento de entrega](ENTREGA.md)** | Modelo para exportação em PDF | — |
 
 > **Com pouco tempo?** Leia a [Linguagem Ubíqua](01-linguagem-ubiqua.md) e o
 > [Fluxo 2 do Event Storming](02-event-storming.md#fluxo-2--elaboração-aprovação-e-reprovação-do-orçamento).
@@ -128,3 +130,5 @@ stateDiagram-v2
 | Justificativa da escolha do banco de dados | [05 — ADR-01](05-arquitetura.md#adr-01--postgresql-como-banco-de-dados) |
 | Análise de vulnerabilidades | [06 — Relatório de segurança](06-relatorio-de-seguranca.md) |
 | Instruções de uso e execução local | [README](../README.md) |
+| Vídeo demonstrando todos os pontos | [07 — Roteiro do vídeo](07-roteiro-do-video.md) |
+| Documento de entrega em PDF | [ENTREGA.md](ENTREGA.md) |

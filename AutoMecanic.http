@@ -1,0 +1,521 @@
+### AutoMecanic — coleção de requisições
+###
+### Percorre o ciclo de vida completo de uma Ordem de Serviço, na ordem em que a oficina
+### realmente trabalha. Cada requisição usa o resultado da anterior, então basta executar
+### de cima para baixo.
+###
+### Como executar:
+###   · VS Code  — extensão "REST Client" (humao.rest-client), clique em "Send Request"
+###   · Visual Studio / Rider — suporte nativo a arquivos .http
+###
+### Pré-requisito: `docker compose up -d --build` e a API saudável em localhost:8080.
+
+@host = http://localhost:8080
+@api = {{host}}/api/v1
+
+# Ajuste para o valor de SEED_SENHA_ADMIN do seu arquivo .env
+@senhaAdmin = Admin@AutoMecanic2026
+
+# Dados do cliente de demonstração. O CPF é fictício, mas válido segundo o
+# algoritmo do módulo 11 — o domínio recusa qualquer outro.
+@documentoCliente = 111.444.777-35
+@placaVeiculo = JKL5M67
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 0 · Saúde do ambiente
+### ────────────────────────────────────────────────────────────────────────────
+
+### 0.1 · Vivacidade — responde enquanto o processo estiver de pé
+GET {{host}}/health/vivo
+
+### 0.2 · Prontidão — só responde saudável com o banco acessível
+GET {{host}}/health/pronto
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 1 · Autenticação
+### ────────────────────────────────────────────────────────────────────────────
+
+### 1.1 · Rota administrativa sem token → 401
+GET {{api}}/clientes
+
+### 1.2 · Credenciais inválidas → 401 com mensagem genérica
+# A resposta é idêntica à de e-mail inexistente: diferenciá-las permitiria
+# descobrir quais contas existem no sistema.
+POST {{api}}/autenticacao/login
+Content-Type: application/json
+
+{
+  "email": "admin@automecanic.com.br",
+  "senha": "senha-errada"
+}
+
+### 1.3 · Login — guarda o token para as requisições seguintes
+# @name login
+POST {{api}}/autenticacao/login
+Content-Type: application/json
+
+{
+  "email": "admin@automecanic.com.br",
+  "senha": "{{senhaAdmin}}"
+}
+
+@token = {{login.response.body.token}}
+
+### 1.4 · Perfil do usuário autenticado
+# O hash da senha não aparece na resposta — o DTO simplesmente não tem esse campo.
+GET {{api}}/usuarios/eu
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 2 · Validação de dados sensíveis
+### ────────────────────────────────────────────────────────────────────────────
+
+### 2.1 · CPF com dígito verificador incorreto → 400
+POST {{api}}/clientes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Cliente Inválido",
+  "documento": "111.111.111-11",
+  "email": "invalido@exemplo.com",
+  "telefone": "11987654321"
+}
+
+### 2.2 · Vários campos inválidos → 400 com TODOS os erros de uma vez
+POST {{api}}/clientes
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "",
+  "documento": "abc",
+  "email": "sem-arroba",
+  "telefone": ""
+}
+
+### 2.3 · Placa fora dos padrões brasileiro e Mercosul → 400
+POST {{api}}/ordens-servico/recepcao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "documentoCliente": "{{documentoCliente}}",
+  "placa": "PLACA-RUIM",
+  "descricaoProblema": "teste"
+}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 3 · Catálogo e estoque
+### ────────────────────────────────────────────────────────────────────────────
+
+### 3.1 · Serviços do catálogo
+# @name servicos
+GET {{api}}/servicos?apenasAtivos=true&tamanhoPagina=5
+Authorization: Bearer {{token}}
+
+@servicoId = {{servicos.response.body.itens[0].id}}
+
+### 3.2 · Peças, com os três saldos decompostos
+# @name pecas
+GET {{api}}/pecas?apenasAtivas=true&tamanhoPagina=5
+Authorization: Bearer {{token}}
+
+@pecaId = {{pecas.response.body.itens[0].id}}
+
+### 3.3 · Peças no ponto de ressuprimento, com sugestão de compra
+GET {{api}}/pecas/alertas
+Authorization: Bearer {{token}}
+
+### 3.4 · Entrada de mercadoria — gera lançamento no razão
+POST {{api}}/pecas/{{pecaId}}/entradas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "quantidade": 30,
+  "motivo": "Nota fiscal 45678 - Distribuidora Central"
+}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 4 · Abertura da Ordem de Serviço
+### ────────────────────────────────────────────────────────────────────────────
+
+### 4.1 · Recepção do veículo
+# Identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o veículo pela placa
+# e abre a OS — tudo em uma transação. A OS nasce no status "Recebida".
+# @name recepcao
+POST {{api}}/ordens-servico/recepcao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "documentoCliente": "{{documentoCliente}}",
+  "nomeCliente": "Carlos Andrade",
+  "emailCliente": "carlos.andrade@exemplo.com.br",
+  "telefoneCliente": "(11) 91234-5678",
+  "placa": "{{placaVeiculo}}",
+  "marca": "Toyota",
+  "modelo": "Corolla XEi 2.0",
+  "anoFabricacao": 2021,
+  "anoModelo": 2022,
+  "cor": "Prata",
+  "descricaoProblema": "Ruído metálico ao frear em baixa velocidade, principalmente pela manhã.",
+  "quilometragemEntrada": 42000
+}
+
+@osId = {{recepcao.response.body.id}}
+@osNumero = {{recepcao.response.body.numero}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 5 · Diagnóstico
+### ────────────────────────────────────────────────────────────────────────────
+
+### 5.1 · Iniciar o diagnóstico → status "Em diagnóstico"
+POST {{api}}/ordens-servico/{{osId}}/diagnostico/iniciar
+Authorization: Bearer {{token}}
+
+### 5.2 · Registrar o laudo técnico
+POST {{api}}/ordens-servico/{{osId}}/diagnostico
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "diagnostico": "Pastilhas dianteiras no limite de desgaste (2 mm). Discos com sulco leve, dentro da tolerância. Fluido de freio escurecido, recomendada a troca."
+}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 6 · Composição da Ordem de Serviço
+### ────────────────────────────────────────────────────────────────────────────
+
+### 6.1 · Incluir um serviço — preço e tempo copiados do catálogo e congelados
+POST {{api}}/ordens-servico/{{osId}}/servicos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "servicoId": "{{servicoId}}",
+  "quantidade": 1
+}
+
+### 6.2 · Incluir uma peça — RESERVA a quantidade no estoque na mesma transação
+POST {{api}}/ordens-servico/{{osId}}/pecas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pecaId": "{{pecaId}}",
+  "quantidade": 4
+}
+
+### 6.3 · Confira o efeito da reserva
+# O saldo FÍSICO não mudou — a peça continua na prateleira.
+# O DISPONÍVEL caiu 4 — essa quantidade já está prometida a esta OS.
+GET {{api}}/pecas/{{pecaId}}
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 7 · Orçamento
+### ────────────────────────────────────────────────────────────────────────────
+
+### 7.1 · Gerar o orçamento — o valor é calculado, nunca informado
+POST {{api}}/ordens-servico/{{osId}}/orcamento
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "percentualDesconto": 10
+}
+
+### 7.2 · Enviar ao cliente → status "Aguardando aprovação"
+POST {{api}}/ordens-servico/{{osId}}/orcamento/enviar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "validadeEmDias": 7
+}
+
+### 7.3 · Tentar alterar itens após o envio → 422
+# Esta é a regra que garante que o cliente aprova exatamente o valor que viu.
+POST {{api}}/ordens-servico/{{osId}}/servicos
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "servicoId": "{{servicoId}}",
+  "quantidade": 1
+}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 8 · Acompanhamento pelo cliente (sem autenticação)
+### ────────────────────────────────────────────────────────────────────────────
+
+### 8.1 · Consulta com número da OS e documento — os dois juntos provam a posse
+GET {{api}}/acompanhamento?numero={{osNumero}}&documento=11144477735
+
+### 8.2 · Documento de outro cliente → 404
+# A resposta é idêntica à de "OS inexistente": distingui-las permitiria
+# percorrer números sequenciais e ler dados de terceiros.
+GET {{api}}/acompanhamento?numero={{osNumero}}&documento=52998224725
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 9 · Decisão do cliente
+### ────────────────────────────────────────────────────────────────────────────
+
+### 9.1 · Aprovar → status "Em execução" e as peças são BAIXADAS do estoque
+POST {{api}}/ordens-servico/{{osId}}/orcamento/aprovar
+Authorization: Bearer {{token}}
+
+### 9.2 · Confira a baixa efetiva
+# Agora o saldo FÍSICO caiu e a reserva zerou: a peça saiu da prateleira.
+GET {{api}}/pecas/{{pecaId}}
+Authorization: Bearer {{token}}
+
+### 9.3 · Razão de estoque desta OS — saldo antes e depois de cada lançamento
+GET {{api}}/pecas/movimentos?ordemServicoId={{osId}}
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 10 · Execução e entrega
+### ────────────────────────────────────────────────────────────────────────────
+
+### 10.1 · Tentar entregar sem finalizar → 422
+# Não existe caminho para "Entregue" que não passe por "Finalizada".
+POST {{api}}/ordens-servico/{{osId}}/entregar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{}
+
+### 10.2 · Finalizar → status "Finalizada", com a duração real calculada
+POST {{api}}/ordens-servico/{{osId}}/finalizar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "observacao": "Pastilhas dianteiras substituídas e fluido de freio trocado. Teste em pista aprovado."
+}
+
+### 10.3 · Entregar → status "Entregue", estado terminal
+POST {{api}}/ordens-servico/{{osId}}/entregar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "observacao": "Cliente retirou o veículo e conferiu o serviço."
+}
+
+### 10.4 · Tentar cancelar uma OS entregue → 422
+POST {{api}}/ordens-servico/{{osId}}/cancelar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "motivo": "tentativa fora de hora"
+}
+
+### 10.5 · Detalhe completo, com a linha do tempo das seis transições
+GET {{api}}/ordens-servico/{{osId}}
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 11 · Fluxo alternativo — reprovação devolve o estoque
+### ────────────────────────────────────────────────────────────────────────────
+
+### 11.1 · Nova OS para o mesmo cliente (já cadastrado)
+# @name segundaOs
+POST {{api}}/ordens-servico/recepcao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "documentoCliente": "{{documentoCliente}}",
+  "placa": "{{placaVeiculo}}",
+  "descricaoProblema": "Revisão dos 45 mil km.",
+  "quilometragemEntrada": 45000
+}
+
+@segundaOsId = {{segundaOs.response.body.id}}
+
+### 11.2 · Diagnóstico
+POST {{api}}/ordens-servico/{{segundaOsId}}/diagnostico/iniciar
+Authorization: Bearer {{token}}
+
+### 11.3 · Incluir peça — reserva 10 unidades
+POST {{api}}/ordens-servico/{{segundaOsId}}/pecas
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "pecaId": "{{pecaId}}",
+  "quantidade": 10
+}
+
+### 11.4 · Gerar e enviar o orçamento
+POST {{api}}/ordens-servico/{{segundaOsId}}/orcamento
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "percentualDesconto": 0
+}
+
+###
+POST {{api}}/ordens-servico/{{segundaOsId}}/orcamento/enviar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "validadeEmDias": 7
+}
+
+### 11.5 · Cliente reprova → OS cancelada e reservas DEVOLVIDAS
+POST {{api}}/ordens-servico/{{segundaOsId}}/orcamento/reprovar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "motivo": "Valor acima do que eu esperava. Vou pesquisar outras oficinas."
+}
+
+### 11.6 · Confira: o saldo voltou ao que era antes da reserva
+GET {{api}}/pecas/{{pecaId}}
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 12 · Gestão administrativa
+### ────────────────────────────────────────────────────────────────────────────
+
+### 12.1 · Listar Ordens de Serviço com filtros
+GET {{api}}/ordens-servico?status=Entregue&tamanhoPagina=10
+Authorization: Bearer {{token}}
+
+### 12.2 · Buscar OS pelo número legível
+GET {{api}}/ordens-servico/numero/{{osNumero}}
+Authorization: Bearer {{token}}
+
+### 12.3 · Buscar cliente pelo documento
+GET {{api}}/clientes/documento/11144477735
+Authorization: Bearer {{token}}
+
+### 12.4 · Buscar veículo pela placa
+GET {{api}}/veiculos/placa/{{placaVeiculo}}
+Authorization: Bearer {{token}}
+
+### 12.5 · Veículos de um cliente
+GET {{api}}/veiculos?termoDeBusca=Corolla
+Authorization: Bearer {{token}}
+
+### 12.6 · Extrato completo do razão de estoque
+GET {{api}}/pecas/movimentos?tamanhoPagina=20
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 13 · Indicadores de gestão
+### ────────────────────────────────────────────────────────────────────────────
+
+### 13.1 · Tempo médio de execução — média, mediana e aderência à estimativa
+# A mediana acompanha a média porque uma única OS excepcionalmente longa
+# distorce a média sem que a operação tenha piorado.
+GET {{api}}/indicadores/tempo-medio-execucao
+Authorization: Bearer {{token}}
+
+### 13.2 · Painel operacional
+GET {{api}}/indicadores/painel
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 14 · Autorização por perfil
+### ────────────────────────────────────────────────────────────────────────────
+
+### 14.1 · Criar um mecânico
+POST {{api}}/usuarios
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "nome": "Roberto Mecânico",
+  "email": "roberto.mecanico@automecanic.com.br",
+  "senha": "Mecanico@2026",
+  "perfil": "Mecanico"
+}
+
+### 14.2 · Autenticar como mecânico
+# @name loginMecanico
+POST {{api}}/autenticacao/login
+Content-Type: application/json
+
+{
+  "email": "roberto.mecanico@automecanic.com.br",
+  "senha": "Mecanico@2026"
+}
+
+@tokenMecanico = {{loginMecanico.response.body.token}}
+
+### 14.3 · Mecânico consultando OS → 200 (política "Consultar")
+GET {{api}}/ordens-servico?tamanhoPagina=5
+Authorization: Bearer {{tokenMecanico}}
+
+### 14.4 · Mecânico tentando gerenciar usuários → 403 (política "Administrar")
+POST {{api}}/usuarios
+Authorization: Bearer {{tokenMecanico}}
+Content-Type: application/json
+
+{
+  "nome": "Alguém",
+  "email": "alguem@automecanic.com.br",
+  "senha": "Alguem@2026",
+  "perfil": "Atendente"
+}
+
+### 14.5 · Mecânico trocando a PRÓPRIA senha → 204
+# Autoatendimento é acessível a qualquer perfil autenticado.
+POST {{api}}/usuarios/eu/senha
+Authorization: Bearer {{tokenMecanico}}
+Content-Type: application/json
+
+{
+  "senhaAtual": "Mecanico@2026",
+  "novaSenha": "NovaSenha@2026"
+}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 15 · Rotina de manutenção
+### ────────────────────────────────────────────────────────────────────────────
+
+### 15.1 · Expirar orçamentos vencidos e devolver as reservas presas
+# Destinado a ser acionado por um agendador.
+POST {{api}}/ordens-servico/manutencao/expirar-orcamentos
+Authorization: Bearer {{token}}
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 16 · Cabeçalhos de segurança
+### ────────────────────────────────────────────────────────────────────────────
+
+### 16.1 · Inspecione os cabeçalhos da resposta
+# Devem estar presentes: X-Content-Type-Options, X-Frame-Options,
+# Referrer-Policy e Permissions-Policy.
+# NÃO deve haver: Server, X-Powered-By, X-AspNet-Version.
+GET {{host}}/health/vivo
+
+### 16.2 · Token forjado → 401
+GET {{api}}/clientes
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.assinatura-invalida
