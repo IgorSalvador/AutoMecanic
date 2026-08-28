@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
+using AutoMecanic.Api;
 using AutoMecanic.Api.Configuracao;
 using AutoMecanic.Api.Filtros;
 using AutoMecanic.Api.Middlewares;
@@ -17,6 +18,13 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Serilog;
+
+// Modo sonda: o HEALTHCHECK do contêiner reexecuta este mesmo binário apenas para
+// consultar /health/pronto. Precisa vir antes de qualquer inicialização de host.
+if (VerificacaoDeSaudeDoContainer.FoiSolicitada(args))
+{
+    return await VerificacaoDeSaudeDoContainer.ExecutarAsync();
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -271,14 +279,17 @@ var app = builder.Build();
 // Pipeline
 // ---------------------------------------------------------------------------
 
-// Primeiro do pipeline: qualquer exceção lançada adiante é convertida em problem+json.
-app.UseMiddleware<MiddlewareDeTratamentoDeExcecoes>();
-
+// O log de requisições vem por fora do tratamento de exceções, e não por dentro: assim
+// ele observa o status final da resposta (401, 404, 422) em vez do estado anterior à
+// conversão, que faria toda falha de negócio aparecer como erro 500 no log.
 app.UseSerilogRequestLogging(opcoes =>
     opcoes.GetLevel = (contexto, _, excecao) =>
         excecao is not null || contexto.Response.StatusCode >= 500
             ? Serilog.Events.LogEventLevel.Error
             : Serilog.Events.LogEventLevel.Information);
+
+// Converte em application/problem+json qualquer exceção lançada adiante no pipeline.
+app.UseMiddleware<MiddlewareDeTratamentoDeExcecoes>();
 
 app.UseMiddleware<MiddlewareDeCabecalhosDeSeguranca>();
 
@@ -327,6 +338,8 @@ app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 await PrepararBancoDeDadosAsync(app);
 
 await app.RunAsync();
+
+return 0;
 
 // Aplica as migrações pendentes e executa a carga inicial de dados.
 //

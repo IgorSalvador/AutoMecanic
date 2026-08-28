@@ -40,17 +40,18 @@ RUN dotnet publish src/AutoMecanic.Api/AutoMecanic.Api.csproj \
 # sobretudo, sem compilador nem ferramentas de build disponíveis a um atacante
 # que consiga executar comandos no contêiner.
 # ---------------------------------------------------------------------------
-FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS final
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
 
-# curl é instalado apenas para o HEALTHCHECK. A imagem de runtime não traz
-# nenhum cliente HTTP, e o orquestrador precisa de um para sondar a aplicação.
-RUN apt-get update \
-    && apt-get install --yes --no-install-recommends curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Executa como usuário sem privilégios. A imagem base já define o usuário 'app';
-# usá-lo evita que uma falha na aplicação vire root dentro do contêiner.
-USER $APP_UID
+# A imagem "chiseled" traz o runtime .NET e praticamente nada além dele: não há
+# shell, gerenciador de pacotes, curl nem os utilitários do Ubuntu que acompanham
+# a imagem padrão. A redução da superfície de ataque é medível — ver
+# docs/06-relatorio-de-seguranca.md — e as ferramentas que um atacante com
+# execução de comandos usaria para se movimentar simplesmente não existem.
+#
+# A contrapartida: sem shell, o HEALTHCHECK não pode ser um comando qualquer.
+# Por isso a própria aplicação implementa o modo sonda "--health-check".
+#
+# A imagem já roda como usuário sem privilégios (UID 1654); não é preciso USER.
 
 WORKDIR /aplicacao
 COPY --from=publish --chown=$APP_UID:$APP_UID /aplicacao ./
@@ -61,8 +62,9 @@ ENV ASPNETCORE_HTTP_PORTS=8080 \
 
 EXPOSE 8080
 
-# A verificação usa o endpoint de prontidão, que confirma também o acesso ao banco.
+# A sonda reexecuta o próprio binário no modo "--health-check", que consulta o
+# endpoint de prontidão — e portanto confirma também o acesso ao banco de dados.
 HEALTHCHECK --interval=20s --timeout=5s --start-period=40s --retries=5 \
-    CMD curl --fail --silent http://localhost:8080/health/pronto || exit 1
+    CMD ["dotnet", "AutoMecanic.Api.dll", "--health-check"]
 
 ENTRYPOINT ["dotnet", "AutoMecanic.Api.dll"]

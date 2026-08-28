@@ -17,8 +17,9 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-automecanic}
       POSTGRES_USER: ${POSTGRES_USER:-automecanic}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
-      # Locale pt-BR para ordenação correta de nomes com acento.
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # Provedor ICU com locale pt-BR: ordena nomes acentuados como um brasileiro
+      # espera ("Ávila" antes de "Bueno"), o que a ordenação por bytes não faz.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale-provider=icu --icu-locale=pt-BR --locale=C"
       TZ: America/Sao_Paulo
     ports:
       # Exposto apenas em 127.0.0.1: o banco fica acessível para ferramentas

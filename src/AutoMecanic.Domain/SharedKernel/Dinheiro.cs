@@ -10,7 +10,27 @@ namespace AutoMecanic.Domain.SharedKernel;
 /// </summary>
 public sealed class Dinheiro : ValueObject, IComparable<Dinheiro>
 {
-    private static readonly CultureInfo CulturaBrasileira = CultureInfo.GetCultureInfo("pt-BR");
+    /// <summary>
+    /// Formato monetário brasileiro construído explicitamente, e não obtido de
+    /// <c>CultureInfo.GetCultureInfo("pt-BR")</c>.
+    /// <para>
+    /// A diferença é concreta: a busca por cultura depende da biblioteca ICU do sistema
+    /// operacional, que <b>não existe</b> em imagens de contêiner mínimas — nelas o .NET roda
+    /// em modo globalização-invariante e a busca lança exceção. Declarar o formato aqui
+    /// mantém a promessa de que a camada de Domínio não depende de nada externo, nem mesmo
+    /// da tabela de culturas do sistema.
+    /// </para>
+    /// </summary>
+    private static readonly NumberFormatInfo FormatoBrasileiro = new()
+    {
+        CurrencySymbol = "R$",
+        CurrencyDecimalSeparator = ",",
+        CurrencyGroupSeparator = ".",
+        CurrencyGroupSizes = [3],
+        CurrencyDecimalDigits = 2,
+        CurrencyPositivePattern = 2, // "R$ 1.234,50"
+        CurrencyNegativePattern = 9  // "R$ -1.234,50"
+    };
 
     private Dinheiro(decimal valor) => Valor = valor;
 
@@ -86,5 +106,5 @@ public sealed class Dinheiro : ValueObject, IComparable<Dinheiro>
         yield return Valor;
     }
 
-    public override string ToString() => Valor.ToString("C2", CulturaBrasileira);
+    public override string ToString() => Valor.ToString("C2", FormatoBrasileiro);
 }
