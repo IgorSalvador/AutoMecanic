@@ -105,13 +105,30 @@ jobs:
 
       # Reprova o pipeline se qualquer dependência, direta ou transitiva,
       # tiver vulnerabilidade conhecida.
+      #
+      # A verificação é feita sobre a saída JSON, e não sobre o texto: a mensagem
+      # "The following sources were used" contém a sequência "low", e um grep
+      # insensível a maiúsculas por severidade acusava vulnerabilidade onde não havia.
+      # O JSON também independe do idioma configurado no runner.
       - name: Varredura de dependências
         run: |
-          dotnet list package --vulnerable --include-transitive 2>&1 | tee vulneraveis.txt
-          if grep -qiE '(Critical|High|Moderate|Low)' vulneraveis.txt; then
-            echo "::error::Dependência vulnerável encontrada."
+          dotnet list package --vulnerable --include-transitive --format json > vulneraveis.json
+
+          FILTRO='[ .projects[]?.frameworks[]? | ((.topLevelPackages // []) + (.transitivePackages // []))[]? | .vulnerabilities[]? ] | length'
+          TOTAL=$(jq "$FILTRO" vulneraveis.json)
+
+          if [ "$TOTAL" -gt 0 ]; then
+            echo "::error::$TOTAL vulnerabilidade(s) encontrada(s) em dependências."
+            jq -r '.projects[]?.frameworks[]?
+                   | ((.topLevelPackages // []) + (.transitivePackages // []))[]?
+                   | select((.vulnerabilities // []) | length > 0)
+                   | .id as $pacote
+                   | .resolvedVersion as $versao
+                   | .vulnerabilities[]
+                   | "  \($pacote) \($versao) — \(.severity): \(.advisoryurl)"' vulneraveis.json
             exit 1
           fi
+
           echo "Nenhuma dependência vulnerável."
 
       - name: Relatar pacotes depreciados
@@ -132,7 +149,7 @@ jobs:
           exit-code: '1'   # reprova em vulnerabilidade crítica ou alta
 
       - name: Enviar resultado para o Code Scanning
-        if: always()
+        if: always() && hashFiles('trivy.sarif') != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy.sarif
