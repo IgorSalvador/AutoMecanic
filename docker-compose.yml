@@ -1,0 +1,84 @@
+# Ambiente completo do AutoMecanic: banco de dados PostgreSQL + API.
+#
+#   docker compose up -d --build
+#   Swagger em http://localhost:8080/swagger
+#
+# Os segredos vêm do arquivo .env (copie de .env.example). Nada sensível é
+# definido aqui: este arquivo vai para o repositório, o .env não.
+
+name: automecanic
+
+services:
+  banco:
+    image: postgres:17-alpine
+    container_name: automecanic-banco
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-automecanic}
+      POSTGRES_USER: ${POSTGRES_USER:-automecanic}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no arquivo .env}
+      # Locale pt-BR para ordenação correta de nomes com acento.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      TZ: America/Sao_Paulo
+    ports:
+      # Exposto apenas em 127.0.0.1: o banco fica acessível para ferramentas
+      # locais sem ficar aberto na rede da máquina.
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - dados-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-automecanic} -d ${POSTGRES_DB:-automecanic}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - automecanic
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: automecanic-api:1.0.0
+    container_name: automecanic-api
+    restart: unless-stopped
+    depends_on:
+      banco:
+        # Só inicia depois que o banco responde: evita a falha de migração na
+        # primeira subida, quando o PostgreSQL ainda está inicializando.
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_HTTP_PORTS: 8080
+
+      ConnectionStrings__PostgreSQL: >-
+        Host=banco;Port=5432;Database=${POSTGRES_DB:-automecanic};Username=${POSTGRES_USER:-automecanic};Password=${POSTGRES_PASSWORD};Maximum Pool Size=50
+
+      Jwt__Emissor: ${JWT_EMISSOR:-AutoMecanic.Api}
+      Jwt__Audiencia: ${JWT_AUDIENCIA:-AutoMecanic.Clientes}
+      Jwt__ChaveDeAssinatura: ${JWT_CHAVE:?defina JWT_CHAVE com no minimo 32 caracteres no arquivo .env}
+      Jwt__ValidadeEmMinutos: ${JWT_VALIDADE_MINUTOS:-60}
+
+      BancoDeDados__MigrarNaInicializacao: "true"
+      BancoDeDados__SemearDados: "true"
+      Seed__SenhaDoAdministrador: ${SEED_SENHA_ADMIN:?defina SEED_SENHA_ADMIN no arquivo .env}
+      Seed__IncluirDadosDeDemonstracao: ${SEED_DEMO:-true}
+
+      Cors__OrigensPermitidas__0: ${CORS_ORIGEM:-http://localhost:3000}
+      TZ: America/Sao_Paulo
+    ports:
+      - "${API_PORT:-8080}:8080"
+    networks:
+      - automecanic
+    security_opt:
+      # Impede que o processo do contêiner ganhe privilégios adicionais via setuid.
+      - no-new-privileges:true
+
+volumes:
+  dados-postgres:
+    name: automecanic-dados-postgres
+
+networks:
+  automecanic:
+    name: automecanic
+    driver: bridge
