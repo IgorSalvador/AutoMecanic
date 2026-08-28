@@ -138,21 +138,62 @@ jobs:
       - name: Construir a imagem de contêiner
         run: docker build --tag automecanic-api:ci .
 
-      - name: Varrer a imagem com Trivy
+      # A varredura é feita em dois passos porque o formato SARIF ignora o filtro de
+      # severidade — o próprio Trivy registra "Building SARIF report with all severities".
+      # Com um passo só, o exit-code reprovaria por qualquer achado MEDIUM ou LOW, e não
+      # pelo critério que queremos.
+
+      # 1 · Portão: reprova o pipeline apenas em vulnerabilidade crítica ou alta.
+      - name: Varrer a imagem com Trivy (portão)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: automecanic-api:ci
+          format: table
+          severity: CRITICAL,HIGH
+          scanners: vuln,secret,misconfig
+          ignore-unfixed: false
+          exit-code: '1'
+
+      # 2 · Relatório: registra todas as severidades, sem reprovar.
+      - name: Varrer a imagem com Trivy (relatório completo)
+        if: always()
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: automecanic-api:ci
           format: sarif
           output: trivy.sarif
-          severity: CRITICAL,HIGH
           scanners: vuln,secret,misconfig
-          exit-code: '1'   # reprova em vulnerabilidade crítica ou alta
+          exit-code: '0'
 
+      # O envio ao Code Scanning depende do GitHub Advanced Security, que não está
+      # disponível em repositório privado sem licença — e o requisito exige repositório
+      # privado. O passo fica como conveniência para quem tiver a licença; sua falha não
+      # reprova o pipeline, porque o portão acima já cumpre o papel de barreira.
       - name: Enviar resultado para o Code Scanning
         if: always() && hashFiles('trivy.sarif') != ''
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy.sarif
+
+      - name: Publicar o relatório completo no resumo do job
+        if: always() && hashFiles('trivy.sarif') != ''
+        run: |
+          {
+            echo '## Varredura da imagem de contêiner'
+            echo
+            jq -r '
+              [ .runs[].results[]? ] as $achados
+              | "Total de achados: \($achados | length)"
+            ' trivy.sarif
+            echo
+            echo '<details><summary>Detalhes</summary>'
+            echo
+            echo '```'
+            jq -r '.runs[].results[]? | "\(.ruleId): \(.message.text // "")"' trivy.sarif | sort -u | head -60
+            echo '```'
+            echo '</details>'
+          } >> $GITHUB_STEP_SUMMARY
 
   ambiente-completo:
     name: Ambiente completo em contêiner
