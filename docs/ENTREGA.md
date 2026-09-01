@@ -11,6 +11,7 @@
 |---|---|
 | **Curso** | Pós-Tech FIAP — Arquitetura de Sistemas .NET com Azure |
 | **Turma** | 15SOAT |
+| **Grupo** | 45 |
 | **Fase** | 1 — Tech Challenge |
 
 ### Participantes
