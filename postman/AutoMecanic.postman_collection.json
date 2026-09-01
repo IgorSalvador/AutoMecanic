@@ -1,0 +1,4140 @@
+{
+  "info": {
+    "_postman_id": "a17e0c5e-0000-4000-8000-automecanic01",
+    "name": "AutoMecanic — Oficina Mecânica",
+    "description": "# AutoMecanic\n\nSistema Integrado de Atendimento e Execução de Serviços — Tech Challenge Fase 1, Pós-Tech FIAP 15SOAT.\n\n## Como usar\n\n1. Suba o ambiente: `docker compose up -d --build`\n2. Ajuste a variável `senhaAdmin` para o valor de `SEED_SENHA_ADMIN` do seu `.env`\n3. Execute a pasta **00 · Fluxo completo** de cima para baixo — ou pelo Collection Runner\n\nA autenticação é da coleção inteira: a requisição de login guarda o token e as demais o herdam. Os endpoints públicos (login e acompanhamento) estão marcados como sem autenticação.\n\n## Organização\n\n- **00 · Fluxo completo** — o ciclo de vida da Ordem de Serviço na ordem em que a oficina trabalha, com verificações automáticas. Inclui os casos negativos que demonstram as regras.\n- **01 a 10** — referência de todos os endpoints, agrupados por recurso e gerados a partir do OpenAPI da própria API.\n\n_Gerada a partir do OpenAPI em 2026-09-01. Para regerar: `node tools/gerar-collection.mjs`._",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Avisa cedo, e com clareza, quando a coleção é executada fora de ordem.",
+          "const precisaDeToken = !pm.request.url.toString().includes(\"/autenticacao/login\")",
+          "    && !pm.request.url.toString().includes(\"/acompanhamento\")",
+          "    && !pm.request.url.toString().includes(\"/health/\");",
+          "",
+          "if (precisaDeToken && !pm.collectionVariables.get(\"token\")) {",
+          "    console.warn(\"Sem token: execute primeiro '02 · Login' na pasta do fluxo completo.\");",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "emailAdmin",
+      "value": "admin@automecanic.com.br",
+      "type": "string"
+    },
+    {
+      "key": "senhaAdmin",
+      "value": "Admin@AutoMecanic2026",
+      "type": "string"
+    },
+    {
+      "key": "documentoCliente",
+      "value": "111.444.777-35",
+      "type": "string"
+    },
+    {
+      "key": "placaVeiculo",
+      "value": "JKL5M67",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "osId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "osNumero",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "servicoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "pecaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "itemPecaId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "itemServicoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "veiculoId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "usuarioId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clienteId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "itemId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "codigoPeca",
+      "value": "OL-5W30-1L",
+      "type": "string"
+    },
+    {
+      "key": "saldoAntes",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 · Fluxo completo da Ordem de Serviço",
+      "description": "Percorre o ciclo de vida inteiro na ordem em que a oficina trabalha. Cada requisição guarda o que a próxima precisa, então basta executar de cima para baixo — ou usar o Collection Runner para rodar tudo de uma vez.\n\nInclui os casos negativos que demonstram as regras: itens congelados após o envio do orçamento, acompanhamento com documento de terceiro e transição inválida em estado terminal.",
+      "item": [
+        {
+          "name": "01 · Prontidão da API",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health/pronto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health",
+                "pronto"
+              ],
+              "query": []
+            },
+            "description": "Só responde saudável com o banco de dados acessível.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"API pronta\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 · Login — guarda o token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/autenticacao/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "autenticacao",
+                "login"
+              ],
+              "query": []
+            },
+            "description": "Autentica e guarda o JWT na variável `token`, usada por todas as requisições seguintes.\n\nAjuste `senhaAdmin` nas variáveis da coleção para o valor de `SEED_SENHA_ADMIN` do seu `.env`.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailAdmin}}\",\n  \"senha\": \"{{senhaAdmin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login bem-sucedido\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().token);",
+                  "pm.test(\"Resposta não expõe hash de senha\", () =>",
+                  "    pm.expect(pm.response.text().toLowerCase()).to.not.include(\"senhahash\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 · Catálogo — guarda um serviço",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos?apenasAtivos=true&tamanhoPagina=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos"
+              ],
+              "query": [
+                {
+                  "key": "apenasAtivos",
+                  "value": "true"
+                },
+                {
+                  "key": "tamanhoPagina",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "O seed cria 10 serviços com preço de tabela e tempo estimado."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Catálogo disponível\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Catálogo semeado\", () => pm.expect(pm.response.json().itens).to.not.be.empty);",
+                  "pm.collectionVariables.set(\"servicoId\", pm.response.json().itens[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 · Estoque — guarda uma peça",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas?apenasAtivas=true&tamanhoPagina=5",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas"
+              ],
+              "query": [
+                {
+                  "key": "apenasAtivas",
+                  "value": "true"
+                },
+                {
+                  "key": "tamanhoPagina",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Repare nos três saldos: em estoque, reservada e disponível."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Estoque disponível\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"pecaId\", pm.response.json().itens[0].id);",
+                  "pm.collectionVariables.set(\"saldoAntes\", pm.response.json().itens[0].quantidadeEmEstoque);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 · CPF inválido → 400",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ],
+              "query": []
+            },
+            "description": "Sequências repetidas passam no cálculo do módulo 11, mas não são CPFs válidos. O domínio as rejeita explicitamente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Cliente Inválido\",\n  \"documento\": \"111.111.111-11\",\n  \"email\": \"invalido@exemplo.com\",\n  \"telefone\": \"11987654321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"CPF inválido recusado\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 · Recepção do veículo → Recebida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/recepcao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "recepcao"
+              ],
+              "query": []
+            },
+            "description": "Identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o veículo pela placa e abre a OS — tudo em uma transação. É o balcão da oficina em uma chamada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentoCliente\": \"{{documentoCliente}}\",\n  \"nomeCliente\": \"Carlos Andrade\",\n  \"emailCliente\": \"carlos.andrade@exemplo.com.br\",\n  \"telefoneCliente\": \"(11) 91234-5678\",\n  \"placa\": \"{{placaVeiculo}}\",\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla XEi 2.0\",\n  \"anoFabricacao\": 2021,\n  \"anoModelo\": 2022,\n  \"cor\": \"Prata\",\n  \"descricaoProblema\": \"Ruído metálico ao frear em baixa velocidade.\",\n  \"quilometragemEntrada\": 42000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"OS aberta\", () => pm.response.to.have.status(201));",
+                  "pm.test(\"Nasce no status Recebida\", () => pm.expect(pm.response.json().status).to.eql(\"Recebida\"));",
+                  "pm.test(\"Número no formato OS-AAAA-NNNNNN\", () =>",
+                  "    pm.expect(pm.response.json().numero).to.match(/^OS-\\d{4}-\\d{6}$/));",
+                  "pm.collectionVariables.set(\"osId\", pm.response.json().id);",
+                  "pm.collectionVariables.set(\"osNumero\", pm.response.json().numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 · Iniciar diagnóstico → Em diagnóstico",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/diagnostico/iniciar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "diagnostico",
+                "iniciar"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Diagnóstico iniciado\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status Em diagnóstico\", () => pm.expect(pm.response.json().status).to.eql(\"EmDiagnostico\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 · Registrar laudo técnico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/diagnostico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "diagnostico"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnostico\": \"Pastilhas dianteiras no limite de desgaste. Fluido de freio escurecido.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Laudo registrado\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 · Incluir serviço — preço congelado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/servicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "servicos"
+              ],
+              "query": []
+            },
+            "description": "O preço vem do catálogo e é copiado para o item. Um reajuste posterior na tabela não altera este orçamento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicoId\": \"{{servicoId}}\",\n  \"quantidade\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Serviço incluído\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Preço foi congelado no item\", () =>",
+                  "    pm.expect(pm.response.json().servicos[0].precoUnitario).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 · Incluir peça — reserva no estoque",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/pecas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "pecas"
+              ],
+              "query": []
+            },
+            "description": "A inclusão reserva a quantidade no estoque na mesma transação. Sem saldo disponível, a operação inteira falha e a OS não muda.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pecaId\": \"{{pecaId}}\",\n  \"quantidade\": 4\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Peça incluída\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Peça marcada como reservada\", () =>",
+                  "    pm.expect(pm.response.json().pecas[0].reservada).to.be.true);",
+                  "pm.collectionVariables.set(\"itemPecaId\", pm.response.json().pecas[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 · Reserva não mexe no saldo físico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": []
+            },
+            "description": "O ponto mais importante do controle de estoque: a peça continua na prateleira, mas deixa de ser prometível a outra Ordem de Serviço."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Peça consultada\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Saldo físico intacto\", () =>",
+                  "    pm.expect(p.quantidadeEmEstoque).to.eql(Number(pm.collectionVariables.get(\"saldoAntes\"))));",
+                  "pm.test(\"Reservado = 4\", () => pm.expect(p.quantidadeReservada).to.eql(4));",
+                  "pm.test(\"Disponível caiu 4\", () =>",
+                  "    pm.expect(p.quantidadeDisponivel).to.eql(p.quantidadeEmEstoque - 4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 · Gerar orçamento — valor calculado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento"
+              ],
+              "query": []
+            },
+            "description": "O valor nunca é informado: é a soma dos itens com o desconto aplicado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"percentualDesconto\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento gerado\", () => pm.response.to.have.status(200));",
+                  "const o = pm.response.json().orcamento;",
+                  "pm.test(\"Total = bruto com desconto\", () =>",
+                  "    pm.expect(o.valorTotal).to.be.closeTo(o.valorBruto * 0.9, 0.01));",
+                  "pm.test(\"Situação Em elaboração\", () => pm.expect(o.status).to.eql(\"EmElaboracao\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 · Enviar ao cliente → Aguardando aprovação",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento/enviar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento",
+                "enviar"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validadeEmDias\": 7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento enviado\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status Aguardando aprovação\", () =>",
+                  "    pm.expect(pm.response.json().status).to.eql(\"AguardandoAprovacao\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 · Alterar item após envio → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/servicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "servicos"
+              ],
+              "query": []
+            },
+            "description": "A regra que garante que o cliente aprova exatamente o valor que viu. Mudar o escopo exige devolver a OS ao diagnóstico e gerar um orçamento novo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicoId\": \"{{servicoId}}\",\n  \"quantidade\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Itens congelados\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Código da regra violada\", () =>",
+                  "    pm.expect(pm.response.json().codigo).to.eql(\"ITENS_CONGELADOS\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 · Acompanhamento pelo cliente (sem token)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento?numero={{osNumero}}&documento=11144477735",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento"
+              ],
+              "query": [
+                {
+                  "key": "numero",
+                  "value": "{{osNumero}}"
+                },
+                {
+                  "key": "documento",
+                  "value": "11144477735"
+                }
+              ]
+            },
+            "description": "Número da OS e documento juntos funcionam como prova de posse. A visão é reduzida: sem responsável técnico, sem custo por peça, sem identificadores internos.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Acompanhamento acessível\", () => pm.response.to.have.status(200));",
+                  "const a = pm.response.json();",
+                  "pm.test(\"Não expõe dados internos\", () => {",
+                  "    pm.expect(a.responsavelId).to.be.undefined;",
+                  "    pm.expect(a.clienteId).to.be.undefined;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 · Acompanhamento com documento de terceiro → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento?numero={{osNumero}}&documento=52998224725",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento"
+              ],
+              "query": [
+                {
+                  "key": "numero",
+                  "value": "{{osNumero}}"
+                },
+                {
+                  "key": "documento",
+                  "value": "52998224725"
+                }
+              ]
+            },
+            "description": "Resposta idêntica à de OS inexistente. Distingui-las permitiria percorrer números sequenciais e ler dados de terceiros.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Documento de terceiro recusado\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 · Aprovar → Em execução e baixa do estoque",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento/aprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento",
+                "aprovar"
+              ],
+              "query": []
+            },
+            "description": "A aprovação é o momento em que a peça sai fisicamente da prateleira."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento aprovado\", () => pm.response.to.have.status(200));",
+                  "const os = pm.response.json();",
+                  "pm.test(\"Status Em execução\", () => pm.expect(os.status).to.eql(\"EmExecucao\"));",
+                  "pm.test(\"Peça consumida\", () => pm.expect(os.pecas[0].consumida).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 · Saldo físico caiu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Peça consultada\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Saldo reduzido em 4\", () =>",
+                  "    pm.expect(p.quantidadeEmEstoque).to.eql(Number(pm.collectionVariables.get(\"saldoAntes\")) - 4));",
+                  "pm.test(\"Reserva zerada\", () => pm.expect(p.quantidadeReservada).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 · Razão de estoque registrou a saída",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/movimentos?ordemServicoId={{osId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "movimentos"
+              ],
+              "query": [
+                {
+                  "key": "ordemServicoId",
+                  "value": "{{osId}}"
+                }
+              ]
+            },
+            "description": "O lançamento é gravado na mesma transação que alterou o saldo: não existe saldo sem lançamento correspondente."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Extrato disponível\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Há uma saída de 4 unidades\", () =>",
+                  "    pm.expect(pm.response.json().itens.some(m => m.tipo === \"Saida\" && m.quantidade === 4)).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 · Entregar sem finalizar → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/entregar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "entregar"
+              ],
+              "query": []
+            },
+            "description": "Não existe caminho para Entregue que não passe por Finalizada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Transição inválida recusada\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 · Finalizar → Finalizada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/finalizar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "finalizar"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observacao\": \"Pastilhas substituídas e fluido trocado. Teste em pista aprovado.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Serviço finalizado\", () => pm.response.to.have.status(200));",
+                  "const os = pm.response.json();",
+                  "pm.test(\"Status Finalizada\", () => pm.expect(os.status).to.eql(\"Finalizada\"));",
+                  "pm.test(\"Duração real calculada\", () =>",
+                  "    pm.expect(os.duracaoDaExecucaoEmMinutos).to.not.be.null);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 · Entregar → Entregue",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/entregar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "entregar"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observacao\": \"Cliente retirou o veículo e conferiu o serviço.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Veículo entregue\", () => pm.response.to.have.status(200));",
+                  "const os = pm.response.json();",
+                  "pm.test(\"Status Entregue\", () => pm.expect(os.status).to.eql(\"Entregue\"));",
+                  "pm.test(\"Linha do tempo com 6 transições\", () =>",
+                  "    pm.expect(os.historico.length).to.eql(6));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "23 · Cancelar OS entregue → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "cancelar"
+              ],
+              "query": []
+            },
+            "description": "Estado terminal não admite novas transições.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"tentativa fora de hora\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Estado terminal recusa transição\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "24 · Tempo médio de execução",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/indicadores/tempo-medio-execucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "indicadores",
+                "tempo-medio-execucao"
+              ],
+              "query": []
+            },
+            "description": "A mediana acompanha a média porque uma única OS excepcionalmente longa distorce a média sem que a operação tenha piorado."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Indicador disponível\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Há ordens finalizadas no período\", () =>",
+                  "    pm.expect(pm.response.json().ordensFinalizadas).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "25 · Painel operacional",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/indicadores/painel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "indicadores",
+                "painel"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Painel disponível\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Contagem por situação preenchida\", () =>",
+                  "    pm.expect(Object.keys(pm.response.json().ordensPorStatus)).to.not.be.empty);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 · Autenticação",
+      "description": "Todas as operações de Autenticacao, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "POST /api/v1/autenticacao/login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/autenticacao/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "autenticacao",
+                "login"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Autentica um usuário e devolve o token JWT.\n\nApós 5 tentativas malsucedidas consecutivas, a conta é bloqueada por 15 minutos.\nA resposta é a mesma para e-mail inexistente e senha incorreta, de propósito: distingui-las\npermitiria descobrir quais e-mails estão cadastrados no sistema.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"carlos.andrade@exemplo.com.br\",\n  \"senha\": \"Senha@Forte1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "02 · Acompanhamento (público)",
+      "description": "Todas as operações de Acompanhamento, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "GET /api/v1/acompanhamento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento"
+              ],
+              "query": [
+                {
+                  "key": "numero",
+                  "value": "",
+                  "description": "Número da OS no formato OS-AAAA-NNNNNN, informado no comprovante.",
+                  "disabled": true
+                },
+                {
+                  "key": "documento",
+                  "value": "",
+                  "description": "CPF ou CNPJ do cliente titular da OS.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Consulta a situação de uma Ordem de Serviço.\n\n\nO endpoint é anônimo, mas exige <b>número da OS e documento do cliente juntos</b>: os dois\n            funcionam como prova de posse. Sem essa combinação, seria possível percorrer números\n            sequenciais de OS e ler dados de outros clientes.\n\nA resposta é idêntica para \"OS inexistente\" e \"documento não confere\" — distingui-las\n            permitiria descobrir quais números de OS existem.\n\nA visão é reduzida de propósito: não expõe responsável técnico, custo individual de peça\n            nem identificadores internos. O orçamento só aparece depois de enviado ao cliente.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "03 · Ordens de Serviço",
+      "description": "Todas as operações de OrdensServico, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "DELETE /api/v1/ordens-servico/{id}/pecas/{itemId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/pecas/{{itemPecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "pecas",
+                "{{itemPecaId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                },
+                {
+                  "key": "itemId",
+                  "value": "{{itemPecaId}}",
+                  "description": "Identificador do item de peça."
+                }
+              ]
+            },
+            "description": "Remove uma peça da OS e devolve a quantidade reservada ao estoque."
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE /api/v1/ordens-servico/{id}/servicos/{itemId}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/servicos/{{itemServicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "servicos",
+                "{{itemServicoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                },
+                {
+                  "key": "itemId",
+                  "value": "{{itemServicoId}}",
+                  "description": "Identificador do item."
+                }
+              ]
+            },
+            "description": "Remove um item de serviço da OS."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/ordens-servico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "Restringe a uma situação.",
+                  "disabled": true
+                },
+                {
+                  "key": "clienteId",
+                  "value": "",
+                  "description": "Restringe a um cliente.",
+                  "disabled": true
+                },
+                {
+                  "key": "veiculoId",
+                  "value": "",
+                  "description": "Restringe a um veículo.",
+                  "disabled": true
+                },
+                {
+                  "key": "de",
+                  "value": "",
+                  "description": "Data inicial de abertura.",
+                  "disabled": true
+                },
+                {
+                  "key": "ate",
+                  "value": "",
+                  "description": "Data final de abertura.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Lista Ordens de Serviço com filtros e paginação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/ordens-servico/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Detalha uma OS, com itens, orçamento e linha do tempo."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/ordens-servico/numero/{numero}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/numero/{{osNumero}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "numero",
+                "{{osNumero}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "numero",
+                  "value": "{{osNumero}}",
+                  "description": "Número no formato OS-AAAA-NNNNNN."
+                }
+              ]
+            },
+            "description": "Detalha uma OS pelo número legível."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/v1/ordens-servico/{id}/responsavel",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/responsavel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "responsavel"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Atribui o responsável técnico pela OS.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"responsavelId\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/v1/ordens-servico/{id}/servicos/{itemId}",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/servicos/{{itemServicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "servicos",
+                "{{itemServicoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                },
+                {
+                  "key": "itemId",
+                  "value": "{{itemServicoId}}",
+                  "description": "Identificador do item."
+                }
+              ]
+            },
+            "description": "Altera a quantidade de um item de serviço.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantidade\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Abre uma OS para cliente e veículo já cadastrados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clienteId\": \"00000000-0000-0000-0000-000000000000\",\n  \"veiculoId\": \"00000000-0000-0000-0000-000000000000\",\n  \"descricaoProblema\": \"Ruído metálico ao frear em baixa velocidade.\",\n  \"quilometragemEntrada\": 42000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/cancelar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/cancelar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "cancelar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Cancela a OS antes da execução.\n\nNão é possível cancelar após a aprovação do orçamento: a partir daí peças já saíram do\nestoque e horas já foram trabalhadas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Justificativa da operação.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/diagnostico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/diagnostico",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "diagnostico"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Registra o laudo técnico do mecânico.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diagnostico\": \"Pastilhas dianteiras no limite de desgaste. Fluido de freio escurecido.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/diagnostico/iniciar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/diagnostico/iniciar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "diagnostico",
+                "iniciar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Inicia o diagnóstico. Move a OS de `Recebida` para `Em diagnóstico`."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/entregar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/entregar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "entregar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Registra a entrega do veículo ao cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observacao\": \"Serviço concluído e testado.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/finalizar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/finalizar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "finalizar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Conclui os serviços. Move a OS para `Finalizada`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observacao\": \"Serviço concluído e testado.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/orcamento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Gera o orçamento automaticamente a partir dos itens da OS.\n\nO valor nunca é informado: é sempre a soma dos itens com o desconto aplicado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"percentualDesconto\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/orcamento/aprovar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento/aprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento",
+                "aprovar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Registra a aprovação do orçamento pelo cliente."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/orcamento/enviar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento/enviar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento",
+                "enviar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Envia o orçamento ao cliente. Move a OS para `Aguardando aprovação`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validadeEmDias\": 7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/orcamento/reprovar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento/reprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento",
+                "reprovar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Registra a reprovação do orçamento pelo cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motivo\": \"Justificativa da operação.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/orcamento/revisar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/orcamento/revisar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "orcamento",
+                "revisar"
+              ],
+              "query": [
+                {
+                  "key": "motivo",
+                  "value": "",
+                  "description": "Justificativa da revisão.",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Devolve a OS ao diagnóstico para revisão do escopo."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/pecas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/pecas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "pecas"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Inclui uma peça na OS e reserva a quantidade no estoque.\n\nA reserva impede que duas Ordens de Serviço prometam a mesma última peça ao cliente.\nA baixa efetiva só ocorre na aprovação do orçamento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pecaId\": \"00000000-0000-0000-0000-000000000000\",\n  \"quantidade\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/{id}/servicos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/servicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "servicos"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Inclui um serviço do catálogo na OS.\n\nPreço e tempo estimado são copiados do catálogo e congelados no item.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"servicoId\": \"00000000-0000-0000-0000-000000000000\",\n  \"quantidade\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/manutencao/expirar-orcamentos",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/manutencao/expirar-orcamentos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "manutencao",
+                "expirar-orcamentos"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Expira orçamentos vencidos e cancela as respectivas Ordens de Serviço.\n\nRotina de manutenção, destinada a ser acionada por um agendador. Libera as reservas\nde peça presas em orçamentos que o cliente nunca respondeu."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/ordens-servico/recepcao",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/recepcao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "recepcao"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Recepção do veículo no balcão: identifica o cliente pelo CPF/CNPJ, localiza ou cadastra\no veículo pela placa e abre a OS — tudo em uma única transação.\n\nCliente e veículo são cadastrados automaticamente quando ainda não existem — nesse caso,\nos dados de contato e as informações do veículo passam a ser obrigatórios.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentoCliente\": \"111.444.777-35\",\n  \"nomeCliente\": \"Carlos Andrade\",\n  \"emailCliente\": \"carlos.andrade@exemplo.com.br\",\n  \"telefoneCliente\": \"(11) 91234-5678\",\n  \"placa\": \"JKL5M67\",\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla XEi 2.0\",\n  \"anoFabricacao\": 2021,\n  \"anoModelo\": 2022,\n  \"cor\": \"Prata\",\n  \"descricaoProblema\": \"Ruído metálico ao frear em baixa velocidade.\",\n  \"quilometragemEntrada\": 42000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "04 · Clientes",
+      "description": "Todas as operações de Clientes, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "DELETE /api/v1/clientes/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteId}}"
+              ],
+              "query": [
+                {
+                  "key": "motivo",
+                  "value": "",
+                  "description": "Justificativa da inativação.",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clienteId}}",
+                  "description": "Identificador do cliente."
+                }
+              ]
+            },
+            "description": "Inativa um cliente.\n\nO cadastro é inativado, nunca excluído: as Ordens de Serviço já emitidas precisam\ncontinuar referenciando um cliente existente."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/clientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ],
+              "query": [
+                {
+                  "key": "termoDeBusca",
+                  "value": "",
+                  "description": "Texto livre aplicado a nome, documento e e-mail.",
+                  "disabled": true
+                },
+                {
+                  "key": "apenasAtivos",
+                  "value": "",
+                  "description": "Quando informado, filtra pela situação do cadastro.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Lista clientes com filtro e paginação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/clientes/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clienteId}}",
+                  "description": "Identificador do cliente."
+                }
+              ]
+            },
+            "description": "Obtém um cliente pelo identificador."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/clientes/documento/{documento}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/documento/{{documentoCliente}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "documento",
+                "{{documentoCliente}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "documento",
+                  "value": "{{documentoCliente}}",
+                  "description": "CPF ou CNPJ, com ou sem máscara."
+                }
+              ]
+            },
+            "description": "Obtém um cliente pelo CPF ou CNPJ.\n\nÉ por este caminho que a recepção identifica o cliente na chegada do veículo."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/clientes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Cadastra um novo cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"documento\": \"111.444.777-35\",\n  \"email\": \"carlos.andrade@exemplo.com.br\",\n  \"telefone\": \"(11) 91234-5678\",\n  \"endereco\": {\n    \"logradouro\": \"Rua das Oficinas\",\n    \"numero\": \"1500\",\n    \"complemento\": \"Sala 2\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"São Paulo\",\n    \"uf\": \"SP\",\n    \"cep\": \"01310-100\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/clientes/{id}/reativar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteId}}/reativar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteId}}",
+                "reativar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clienteId}}",
+                  "description": "Identificador do cliente."
+                }
+              ]
+            },
+            "description": "Reativa um cliente inativo."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/v1/clientes/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clientes/{{clienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clientes",
+                "{{clienteId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{clienteId}}",
+                  "description": "Identificador do cliente."
+                }
+              ]
+            },
+            "description": "Atualiza os dados cadastrais de um cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"email\": \"carlos.andrade@exemplo.com.br\",\n  \"telefone\": \"(11) 91234-5678\",\n  \"endereco\": {\n    \"logradouro\": \"Rua das Oficinas\",\n    \"numero\": \"1500\",\n    \"complemento\": \"Sala 2\",\n    \"bairro\": \"Centro\",\n    \"cidade\": \"São Paulo\",\n    \"uf\": \"SP\",\n    \"cep\": \"01310-100\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "05 · Veículos",
+      "description": "Todas as operações de Veiculos, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "DELETE /api/v1/veiculos/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/{{veiculoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "{{veiculoId}}"
+              ],
+              "query": [
+                {
+                  "key": "motivo",
+                  "value": "",
+                  "description": "Justificativa da inativação.",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{veiculoId}}",
+                  "description": "Identificador do veículo."
+                }
+              ]
+            },
+            "description": "Inativa um veículo."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/veiculos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos"
+              ],
+              "query": [
+                {
+                  "key": "termoDeBusca",
+                  "value": "",
+                  "description": "Texto livre aplicado a placa, marca e modelo.",
+                  "disabled": true
+                },
+                {
+                  "key": "clienteId",
+                  "value": "",
+                  "description": "Restringe a um proprietário.",
+                  "disabled": true
+                },
+                {
+                  "key": "apenasAtivos",
+                  "value": "",
+                  "description": "Filtra pela situação do cadastro.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Lista veículos com filtro e paginação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/veiculos/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/{{veiculoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "{{veiculoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{veiculoId}}",
+                  "description": "Identificador do veículo."
+                }
+              ]
+            },
+            "description": "Obtém um veículo pelo identificador."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/veiculos/cliente/{clienteId}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/cliente/{{clienteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "cliente",
+                "{{clienteId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "clienteId",
+                  "value": "{{clienteId}}",
+                  "description": "Identificador do cliente."
+                }
+              ]
+            },
+            "description": "Lista os veículos de um cliente."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/veiculos/placa/{placa}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/placa/{{placaVeiculo}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "placa",
+                "{{placaVeiculo}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "placa",
+                  "value": "{{placaVeiculo}}",
+                  "description": "Placa no padrão ABC1234 ou ABC1D23, com ou sem hífen."
+                }
+              ]
+            },
+            "description": "Obtém um veículo pela placa."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/v1/veiculos/{id}/quilometragem",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/{{veiculoId}}/quilometragem",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "{{veiculoId}}",
+                "quilometragem"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{veiculoId}}",
+                  "description": "Identificador do veículo."
+                }
+              ]
+            },
+            "description": "Registra nova leitura do odômetro.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quilometragem\": 42000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/veiculos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Cadastra um veículo para um cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clienteId\": \"00000000-0000-0000-0000-000000000000\",\n  \"placa\": \"JKL5M67\",\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla XEi 2.0\",\n  \"anoFabricacao\": 2021,\n  \"anoModelo\": 2022,\n  \"cor\": \"Prata\",\n  \"quilometragem\": 42000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/veiculos/{id}/reativar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/{{veiculoId}}/reativar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "{{veiculoId}}",
+                "reativar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{veiculoId}}",
+                  "description": "Identificador do veículo."
+                }
+              ]
+            },
+            "description": "Reativa um veículo inativo."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/veiculos/{id}/transferir",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/{{veiculoId}}/transferir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "{{veiculoId}}",
+                "transferir"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{veiculoId}}",
+                  "description": "Identificador do veículo."
+                }
+              ]
+            },
+            "description": "Transfere o veículo para outro cliente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"novoClienteId\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/v1/veiculos/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/veiculos/{{veiculoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "veiculos",
+                "{{veiculoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{veiculoId}}",
+                  "description": "Identificador do veículo."
+                }
+              ]
+            },
+            "description": "Atualiza os dados descritivos do veículo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla XEi 2.0\",\n  \"anoFabricacao\": 2021,\n  \"anoModelo\": 2022,\n  \"cor\": \"Prata\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "06 · Catálogo de Serviços",
+      "description": "Todas as operações de Servicos, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "DELETE /api/v1/servicos/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos/{{servicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos",
+                "{{servicoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{servicoId}}",
+                  "description": "Identificador do serviço."
+                }
+              ]
+            },
+            "description": "Inativa um serviço, retirando-o do catálogo."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/servicos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos"
+              ],
+              "query": [
+                {
+                  "key": "termoDeBusca",
+                  "value": "",
+                  "description": "Texto livre aplicado a nome e descrição.",
+                  "disabled": true
+                },
+                {
+                  "key": "categoria",
+                  "value": "",
+                  "description": "Restringe a uma categoria.",
+                  "disabled": true
+                },
+                {
+                  "key": "apenasAtivos",
+                  "value": "",
+                  "description": "Filtra pela situação do serviço.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Lista serviços com filtro e paginação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/servicos/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos/{{servicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos",
+                "{{servicoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{servicoId}}",
+                  "description": "Identificador do serviço."
+                }
+              ]
+            },
+            "description": "Obtém um serviço do catálogo."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/v1/servicos/{id}/preco",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos/{{servicoId}}/preco",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos",
+                "{{servicoId}}",
+                "preco"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{servicoId}}",
+                  "description": "Identificador do serviço."
+                }
+              ]
+            },
+            "description": "Reajusta o preço de tabela.\n\nO reajuste vale apenas para novas Ordens de Serviço: os itens já incluídos guardam\numa cópia do preço vigente na data da inclusão.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"novoPreco\": 249.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/servicos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Inclui um serviço no catálogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"descricao\": \"Descrição detalhada.\",\n  \"categoria\": \"ManutencaoPreventiva\",\n  \"preco\": 199.9,\n  \"tempoEstimadoEmMinutos\": 60\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/servicos/{id}/reativar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos/{{servicoId}}/reativar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos",
+                "{{servicoId}}",
+                "reativar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{servicoId}}",
+                  "description": "Identificador do serviço."
+                }
+              ]
+            },
+            "description": "Reativa um serviço inativo."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/v1/servicos/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos/{{servicoId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos",
+                "{{servicoId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{servicoId}}",
+                  "description": "Identificador do serviço."
+                }
+              ]
+            },
+            "description": "Atualiza um serviço do catálogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"descricao\": \"Descrição detalhada.\",\n  \"categoria\": \"ManutencaoPreventiva\",\n  \"tempoEstimadoEmMinutos\": 60\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "07 · Peças e Estoque",
+      "description": "Todas as operações de Pecas, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "DELETE /api/v1/pecas/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Inativa uma peça."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/pecas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas"
+              ],
+              "query": [
+                {
+                  "key": "termoDeBusca",
+                  "value": "",
+                  "description": "Texto livre aplicado a código, nome e descrição.",
+                  "disabled": true
+                },
+                {
+                  "key": "apenasAtivas",
+                  "value": "",
+                  "description": "Filtra pela situação da peça.",
+                  "disabled": true
+                },
+                {
+                  "key": "apenasAbaixoDoMinimo",
+                  "value": "",
+                  "description": "Quando verdadeiro, traz somente o que precisa de reposição.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Lista peças com filtro e paginação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/pecas/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Obtém uma peça pelo identificador."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/pecas/alertas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/alertas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "alertas"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Lista as peças que precisam de reposição."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/pecas/codigo/{codigo}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/codigo/{{codigoPeca}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "codigo",
+                "{{codigoPeca}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "codigo",
+                  "value": "{{codigoPeca}}",
+                  "description": "Código da peça."
+                }
+              ]
+            },
+            "description": "Obtém uma peça pelo código interno (SKU)."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/pecas/movimentos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/movimentos",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "movimentos"
+              ],
+              "query": [
+                {
+                  "key": "pecaId",
+                  "value": "",
+                  "description": "Restringe a uma peça.",
+                  "disabled": true
+                },
+                {
+                  "key": "ordemServicoId",
+                  "value": "",
+                  "description": "Restringe às movimentações de uma OS.",
+                  "disabled": true
+                },
+                {
+                  "key": "tipo",
+                  "value": "",
+                  "description": "Restringe a um tipo de movimento.",
+                  "disabled": true
+                },
+                {
+                  "key": "de",
+                  "value": "",
+                  "description": "Início do período.",
+                  "disabled": true
+                },
+                {
+                  "key": "ate",
+                  "value": "",
+                  "description": "Fim do período.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Consulta o extrato de movimentações do estoque.\n\nO razão é append-only: nenhum lançamento é alterado ou removido."
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH /api/v1/pecas/{id}/preco",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}/preco",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}",
+                "preco"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Reajusta o preço de venda da peça.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"novoPreco\": 249.9\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/pecas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Cadastra uma peça ou insumo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo\": \"PECA-EXEMPLO-001\",\n  \"nome\": \"Carlos Andrade\",\n  \"descricao\": \"Descrição detalhada.\",\n  \"unidadeMedida\": \"Unidade\",\n  \"precoUnitario\": 89.9,\n  \"quantidadeInicial\": 10,\n  \"estoqueMinimo\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/pecas/{id}/ajustes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}/ajustes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}",
+                "ajustes"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Ajusta o saldo para a quantidade apurada em contagem física.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantidadeApurada\": 10,\n  \"motivo\": \"Justificativa da operação.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/pecas/{id}/entradas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}/entradas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}",
+                "entradas"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Registra entrada de mercadoria no estoque.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantidade\": 1,\n  \"motivo\": \"Justificativa da operação.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/pecas/{id}/perdas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}/perdas",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}",
+                "perdas"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Registra baixa por perda, avaria ou vencimento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantidade\": 1,\n  \"motivo\": \"Justificativa da operação.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/pecas/{id}/reativar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}/reativar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}",
+                "reativar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Reativa uma peça inativa."
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/v1/pecas/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{pecaId}}",
+                  "description": "Identificador da peça."
+                }
+              ]
+            },
+            "description": "Atualiza os dados descritivos e o ponto de ressuprimento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"descricao\": \"Descrição detalhada.\",\n  \"unidadeMedida\": \"Unidade\",\n  \"estoqueMinimo\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "08 · Usuários",
+      "description": "Todas as operações de Usuarios, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "DELETE /api/v1/usuarios/{id}",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{usuarioId}}",
+                  "description": "Identificador do usuário."
+                }
+              ]
+            },
+            "description": "Inativa um usuário, revogando seu acesso."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/usuarios",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ],
+              "query": [
+                {
+                  "key": "termoDeBusca",
+                  "value": "",
+                  "description": "Texto livre aplicado a nome e e-mail.",
+                  "disabled": true
+                },
+                {
+                  "key": "perfil",
+                  "value": "",
+                  "description": "Restringe a um perfil.",
+                  "disabled": true
+                },
+                {
+                  "key": "apenasAtivos",
+                  "value": "",
+                  "description": "Filtra pela situação da conta.",
+                  "disabled": true
+                },
+                {
+                  "key": "Pagina",
+                  "value": "",
+                  "description": "Número da página, começando em 1.",
+                  "disabled": true
+                },
+                {
+                  "key": "TamanhoPagina",
+                  "value": "",
+                  "description": "Itens por página. Valores fora da faixa são ajustados silenciosamente.",
+                  "disabled": true
+                },
+                {
+                  "key": "Deslocamento",
+                  "value": "",
+                  "description": "Quantidade de registros a pular na consulta.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Lista usuários com filtro e paginação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/usuarios/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{usuarioId}}",
+                  "description": "Identificador do usuário."
+                }
+              ]
+            },
+            "description": "Obtém um usuário pelo identificador."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/usuarios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Cria um usuário administrativo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"email\": \"carlos.andrade@exemplo.com.br\",\n  \"senha\": \"Senha@Forte1\",\n  \"perfil\": \"Administrador\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/usuarios/{id}/desbloquear",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioId}}/desbloquear",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioId}}",
+                "desbloquear"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{usuarioId}}",
+                  "description": "Identificador do usuário."
+                }
+              ]
+            },
+            "description": "Desbloqueia uma conta travada por tentativas malsucedidas."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/usuarios/{id}/reativar",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioId}}/reativar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioId}}",
+                "reativar"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{usuarioId}}",
+                  "description": "Identificador do usuário."
+                }
+              ]
+            },
+            "description": "Reativa um usuário inativo."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/usuarios/{id}/senha/redefinir",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioId}}/senha/redefinir",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioId}}",
+                "senha",
+                "redefinir"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{usuarioId}}",
+                  "description": "Identificador do usuário."
+                }
+              ]
+            },
+            "description": "Redefine a senha de um usuário.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"novaSenha\": \"NovaSenha@2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT /api/v1/usuarios/{id}",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/{{usuarioId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "{{usuarioId}}"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{usuarioId}}",
+                  "description": "Identificador do usuário."
+                }
+              ]
+            },
+            "description": "Atualiza nome e perfil de um usuário.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Carlos Andrade\",\n  \"perfil\": \"Administrador\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "09 · Meu Perfil",
+      "description": "Todas as operações de MeuPerfil, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "GET /api/v1/usuarios/eu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/eu",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "eu"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Dados do usuário autenticado na requisição corrente.\n\nDisponível a qualquer usuário autenticado, independentemente do perfil."
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/usuarios/eu/senha",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/usuarios/eu/senha",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "usuarios",
+                "eu",
+                "senha"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Troca a própria senha.\n\nExige a senha atual como prova de identidade: sem isso, um token roubado permitiria\ntomar a conta permanentemente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"senhaAtual\": \"Senha@Forte1\",\n  \"novaSenha\": \"NovaSenha@2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10 · Indicadores",
+      "description": "Todas as operações de Indicadores, geradas a partir do OpenAPI.",
+      "item": [
+        {
+          "name": "GET /api/v1/indicadores/painel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/indicadores/painel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "indicadores",
+                "painel"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "Fotografia atual da operação."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/indicadores/tempo-medio-execucao",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/indicadores/tempo-medio-execucao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "indicadores",
+                "tempo-medio-execucao"
+              ],
+              "query": [
+                {
+                  "key": "de",
+                  "value": "",
+                  "description": "Início do período. Quando omitido, considera os últimos 30 dias.",
+                  "disabled": true
+                },
+                {
+                  "key": "ate",
+                  "value": "",
+                  "description": "Fim do período. Quando omitido, considera o instante atual.",
+                  "disabled": true
+                }
+              ],
+              "variable": []
+            },
+            "description": "Tempo médio de execução dos serviços no período.\n\n\nO tempo de execução é medido entre a aprovação do orçamento (início da execução) e a\n            finalização dos serviços. Só entram no cálculo as Ordens de Serviço finalizadas dentro\n            do período.\n\nA <b>mediana</b> acompanha a média porque uma única OS excepcionalmente longa distorce\n            a média sem que a operação tenha piorado. A <b>aderência à estimativa</b> compara o\n            tempo real com o tempo previsto no catálogo: acima de 1, a oficina leva mais tempo do\n            que promete ao cliente."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

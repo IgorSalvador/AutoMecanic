@@ -231,6 +231,33 @@ jobs:
           curl --fail --silent http://localhost:8080/swagger/v1/swagger.json > /dev/null
           echo "Documentação OpenAPI disponível."
 
+      # Executa a coleção Postman contra o ambiente recém-subido. É o que impede a
+      # coleção de envelhecer em silêncio: se um endpoint mudar de contrato, o fluxo
+      # guiado quebra aqui, e não na mão de quem for demonstrar o sistema.
+      - name: Executar a coleção Postman
+        run: |
+          SENHA=$(grep '^SEED_SENHA_ADMIN=' .env | cut -d= -f2-)
+          npx --yes newman run postman/AutoMecanic.postman_collection.json \
+            --folder "00 · Fluxo completo da Ordem de Serviço" \
+            --env-var "senhaAdmin=$SENHA" \
+            --reporters cli \
+            --color off
+
+      # A parte de referência da coleção é derivada do OpenAPI. Se ela estiver
+      # desatualizada, o arquivo regerado difere do versionado — e o aviso aparece
+      # aqui, sem reprovar o pipeline por uma diferença cosmética de data.
+      - name: Conferir se a coleção está atualizada
+        continue-on-error: true
+        run: |
+          node tools/gerar-collection.mjs --saida /tmp/postman-gerado
+          if ! diff -q \
+              <(jq 'del(.info.description)' postman/AutoMecanic.postman_collection.json) \
+              <(jq 'del(.info.description)' /tmp/postman-gerado/AutoMecanic.postman_collection.json) > /dev/null; then
+            echo "::warning::A coleção versionada difere da gerada. Rode 'node tools/gerar-collection.mjs' e comite."
+          else
+            echo "Coleção sincronizada com o OpenAPI."
+          fi
+
       - name: Encerrar
         if: always()
         run: docker compose down -v

@@ -17,8 +17,12 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Deixe abertos: o Swagger (`http://localhost:8080/swagger`), o `AutoMecanic.http` no editor e
-o terminal.
+Deixe abertos: o Swagger (`http://localhost:8080/swagger`), a coleção Postman importada (ou o
+`AutoMecanic.http` no editor) e o terminal.
+
+> **O ambiente já sobe povoado.** O seed cria 8 Ordens de Serviço distribuídas por todas as
+> situações, então o painel operacional e o indicador de tempo médio têm dados reais desde o
+> primeiro acesso — você não precisa executar o fluxo antes de mostrar os números.
 
 ---
 
@@ -128,11 +132,11 @@ Destaque o número gerado: `OS-2026-000001`.
 
 Mostre o `GET /pecas/{id}` **antes e depois**:
 
-| | Antes | Depois |
-|---|---:|---:|
-| `quantidadeEmEstoque` | 150 | **150** |
+| Campo | Antes | Depois |
+|---|---|---|
+| `quantidadeEmEstoque` | N | **N — não muda** |
 | `quantidadeReservada` | 0 | **4** |
-| `quantidadeDisponivel` | 150 | **146** |
+| `quantidadeDisponivel` | N | **N − 4** |
 
 > "A peça continua na prateleira, mas já não pode ser prometida a outra OS. É isso que impede
 > duas Ordens de Serviço de venderem a mesma última peça — o problema de controle de estoque

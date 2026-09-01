@@ -132,3 +132,4 @@ stateDiagram-v2
 | Instruções de uso e execução local | [README](../README.md) |
 | Vídeo demonstrando todos os pontos | [07 — Roteiro do vídeo](07-roteiro-do-video.md) |
 | Documento de entrega em PDF | [ENTREGA.md](ENTREGA.md) |
+| Coleção de requisições HTTP | [postman/](../postman/README.md) · [AutoMecanic.http](../AutoMecanic.http) |

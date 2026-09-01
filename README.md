@@ -70,8 +70,13 @@ curl -X POST http://localhost:8080/api/v1/autenticacao/login \
 
 Copie o `token` da resposta e informe-o no botão **Authorize** do Swagger.
 
-Com `SEED_DEMO=true` (padrão), o ambiente já vem com **10 serviços**, **12 peças** e
-**3 clientes com veículos** para exercitar os fluxos imediatamente.
+Com `SEED_DEMO=true` (padrão), o ambiente já vem povoado: **10 serviços**, **12 peças**,
+**8 clientes com veículos** e **8 Ordens de Serviço distribuídas por todas as situações** —
+3 entregues, 1 em execução, 1 aguardando aprovação, 1 cancelada, 1 em diagnóstico e 1 recebida.
+
+Isso significa que o **painel operacional**, o **indicador de tempo médio de execução** e os
+**alertas de estoque** já respondem com dados reais no primeiro acesso, sem precisar executar
+o fluxo à mão antes de ver qualquer número.
 
 ### Encerrando
 
@@ -140,8 +145,12 @@ do estoque**. Ou `POST .../orcamento/reprovar` → a OS é cancelada e as **rese
 
 **8 ·** `POST .../entregar` — estado terminal. Qualquer nova ação recebe `422`.
 
-Todas as requisições acima estão prontas em **[`AutoMecanic.http`](AutoMecanic.http)** — abra
-no VS Code com a extensão *REST Client* e clique em *Send Request*.
+Todas as requisições acima estão prontas em duas formas:
+
+- **[Coleção Postman](postman/)** — 98 requisições, com o fluxo guiado e 51 verificações
+  automáticas. Importe os dois arquivos de `postman/` e execute a pasta *00 · Fluxo completo*.
+- **[`AutoMecanic.http`](AutoMecanic.http)** — para quem prefere não sair do editor, com a
+  extensão *REST Client* do VS Code.
 
 **Acompanhamento pelo cliente**, sem autenticação:
 
@@ -164,6 +173,7 @@ GET /api/v1/acompanhamento?numero=OS-2026-000001&documento=11144477735
 | [Relatório de segurança](docs/06-relatorio-de-seguranca.md) | Análise de vulnerabilidades e OWASP API Top 10 |
 | [Roteiro do vídeo](docs/07-roteiro-do-video.md) | Demonstração de 15 minutos, passo a passo |
 | [Documento de entrega](docs/ENTREGA.md) | Modelo para exportação em PDF |
+| [Coleção Postman](postman/README.md) | Como importar, executar e regerar a coleção |
 
 ---
 
