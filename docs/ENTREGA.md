@@ -1,10 +1,5 @@
 # Documento de Entrega — Tech Challenge Fase 1
 
-> **Modelo para exportação em PDF.** Preencha os campos marcados com `<<…>>` e exporte
-> (VS Code: *Markdown PDF*; ou cole no Google Docs e baixe como PDF).
-
----
-
 ## Identificação
 
 | | |
@@ -30,7 +25,7 @@
 |---|---|
 | **Repositório (privado)** | https://github.com/IgorSalvador/AutoMecanic |
 | **Documentação DDD** | https://github.com/IgorSalvador/AutoMecanic/blob/main/docs/00-visao-geral.md |
-| **Vídeo de demonstração** | `<<link do vídeo>>` |
+| **Vídeo de demonstração** | https://www.youtube.com/watch?v=4m0lf6uXhtM |
 | **Relatório de vulnerabilidades** | https://github.com/IgorSalvador/AutoMecanic/blob/main/docs/06-relatorio-de-seguranca.md |
 
 ---
@@ -44,7 +39,7 @@ do veículo, diagnóstico, orçamento, execução, entrega e controle de estoque
 ### Como executar
 
 ```bash
-git clone <<url do repositório>> && cd AutoMecanic
+git clone https://github.com/IgorSalvador/AutoMecanic.git && cd AutoMecanic
 cp .env.example .env      # ajuste POSTGRES_PASSWORD, JWT_CHAVE e SEED_SENHA_ADMIN
 docker compose up -d --build
 ```
