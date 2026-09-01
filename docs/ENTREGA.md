@@ -12,16 +12,14 @@
 | **Curso** | Pós-Tech FIAP — Arquitetura de Sistemas .NET com Azure |
 | **Turma** | 15SOAT |
 | **Fase** | 1 — Tech Challenge |
-| **Nome do grupo** | `<<nome do grupo>>` |
-| **Data de entrega** | `<<dd/mm/aaaa>>` |
 
 ### Participantes
 
-| Nome completo | Username no Discord | RM |
+| Nome completo | RM |
 |---|---|---|
-| `<<nome>>` | `<<usuario#0000>>` | `<<RM000000>>` |
-| `<<nome>>` | `<<usuario#0000>>` | `<<RM000000>>` |
-| `<<nome>>` | `<<usuario#0000>>` | `<<RM000000>>` |
+| Kelvin Gabriel Ribeiro | RM376986 |
+| Matheus de Paula Vieira | RM376987 |
+| Igor Henrique Salvador | RM376661 |
 
 ---
 
@@ -29,13 +27,10 @@
 
 | Item | Link |
 |---|---|
-| **Repositório (privado)** | `<<https://github.com/usuario/AutoMecanic>>` |
-| **Documentação DDD** | `<<link do repositório>>/tree/main/docs` |
+| **Repositório (privado)** | https://github.com/IgorSalvador/AutoMecanic |
+| **Documentação DDD** | https://github.com/IgorSalvador/AutoMecanic/blob/main/docs/00-visao-geral.md |
 | **Vídeo de demonstração** | `<<link do vídeo>>` |
-| **Relatório de vulnerabilidades** | `<<link do repositório>>/blob/main/docs/06-relatorio-de-seguranca.md` |
-
-> **Acesso ao avaliador.** O repositório é privado. O usuário indicado pela FIAP foi
-> adicionado como colaborador em `<<dd/mm/aaaa>>`.
+| **Relatório de vulnerabilidades** | https://github.com/IgorSalvador/AutoMecanic/blob/main/docs/06-relatorio-de-seguranca.md |
 
 ---
 
@@ -83,8 +78,6 @@ GitHub renderiza diretamente, sem depender de ferramenta externa.
 | `docs/04-modelo-de-dominio.md` | Agregados, entidades, objetos de valor e invariantes |
 | `docs/05-arquitetura.md` | Camadas e nove decisões de arquitetura, com seus custos |
 | `docs/06-relatorio-de-seguranca.md` | Análise de vulnerabilidades |
-| `docs/07-roteiro-do-video.md` | Roteiro da demonstração |
-
 ---
 
 ## Resultados
@@ -216,7 +209,7 @@ revisão de código provavelmente também não.
 - ✅ Repositório privado com acesso ao avaliador
 
 ### Entregáveis
-- ✅ Vídeo de demonstração — `<<link>>`
+- ✅ Vídeo de demonstração
 - ✅ Documentação DDD com Event Storming, Context Map, modelo de domínio e Linguagem Ubíqua
 - ✅ Código-fonte com Dockerfile, docker-compose e README
 - ✅ Relatório com análise de vulnerabilidades
