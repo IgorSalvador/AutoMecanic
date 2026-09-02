@@ -25,7 +25,7 @@
 |---|---|
 | **Repositório (privado)** | https://github.com/IgorSalvador/AutoMecanic |
 | **Documentação DDD** | https://github.com/IgorSalvador/AutoMecanic/blob/main/docs/00-visao-geral.md |
-| **Vídeo de demonstração** | https://www.youtube.com/watch?v=4m0lf6uXhtM |
+| **Vídeo de demonstração** | https://www.youtube.com/watch?v=AiyZPyu4jkg |
 | **Relatório de vulnerabilidades** | https://github.com/IgorSalvador/AutoMecanic/blob/main/docs/06-relatorio-de-seguranca.md |
 
 ---
