@@ -54,7 +54,7 @@ public sealed class Peca : AggregateRoot
         QuantidadeReservada = 0;
         EstoqueMinimo = estoqueMinimo;
         Ativo = true;
-        CadastradoEm = DateTimeOffset.UtcNow;
+        CadastradoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>Código interno / SKU. Chave natural usada pelo almoxarifado.</summary>
@@ -135,7 +135,7 @@ public sealed class Peca : AggregateRoot
         Descricao = NormalizarDescricao(descricao);
         UnidadeMedida = unidadeMedida;
         EstoqueMinimo = estoqueMinimo;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         AvaliarNivelMinimo();
     }
@@ -153,7 +153,7 @@ public sealed class Peca : AggregateRoot
 
         var anterior = PrecoUnitario;
         PrecoUnitario = precoValidado;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new PrecoDaPecaReajustado(Id, anterior.Valor, precoValidado.Valor));
     }
@@ -174,7 +174,7 @@ public sealed class Peca : AggregateRoot
         }
 
         QuantidadeEmEstoque += quantidade;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         var tipo = ordemServicoId is null ? TipoMovimentoEstoque.Entrada : TipoMovimentoEstoque.Estorno;
 
@@ -200,7 +200,7 @@ public sealed class Peca : AggregateRoot
         }
 
         QuantidadeReservada += quantidade;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new Events.QuantidadeReservada(Id, ordemServicoId, quantidade));
 
@@ -220,7 +220,7 @@ public sealed class Peca : AggregateRoot
         }
 
         QuantidadeReservada -= quantidade;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new ReservaLiberada(Id, ordemServicoId, quantidade));
     }
@@ -245,7 +245,7 @@ public sealed class Peca : AggregateRoot
 
         QuantidadeReservada -= quantidade;
         QuantidadeEmEstoque -= quantidade;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new EstoqueMovimentado(
             Id, TipoMovimentoEstoque.Saida, quantidade, saldoAnterior, QuantidadeEmEstoque,
@@ -270,7 +270,7 @@ public sealed class Peca : AggregateRoot
         var saldoAnterior = QuantidadeEmEstoque;
 
         QuantidadeEmEstoque -= quantidade;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new EstoqueMovimentado(
             Id, TipoMovimentoEstoque.Perda, quantidade, saldoAnterior, QuantidadeEmEstoque, ExigirMotivo(motivo), null));
@@ -303,7 +303,7 @@ public sealed class Peca : AggregateRoot
         var diferenca = Math.Abs(quantidadeApurada - saldoAnterior);
 
         QuantidadeEmEstoque = quantidadeApurada;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new EstoqueMovimentado(
             Id, TipoMovimentoEstoque.Ajuste, diferenca, saldoAnterior, QuantidadeEmEstoque, ExigirMotivo(motivo), null));
@@ -326,7 +326,7 @@ public sealed class Peca : AggregateRoot
         }
 
         Ativo = false;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new PecaInativada(Id, Codigo));
     }
@@ -339,7 +339,7 @@ public sealed class Peca : AggregateRoot
         }
 
         Ativo = true;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     public void GarantirPecaAtiva()

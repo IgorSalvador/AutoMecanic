@@ -6,6 +6,7 @@ using AutoMecanic.Infrastructure.Servicos;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AutoMecanic.Infrastructure;
 
@@ -70,6 +71,9 @@ public static class DependencyInjection
         services.AddScoped<IRepositorioDeOrdensServico, RepositorioDeOrdensServico>();
         services.AddScoped<IRepositorioDeUsuarios, RepositorioDeUsuarios>();
 
+        // Fonte única de tempo. TryAdd permite que os testes de integração registrem antes um
+        // relógio controlado; a composição repassa o mesmo provedor ao relógio do domínio.
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IProvedorDeDataHora, ProvedorDeDataHora>();
         services.AddSingleton<IServicoDeHashDeSenha, ServicoDeHashDeSenhaBCrypt>();
         services.AddScoped<IGeradorDeToken, GeradorDeTokenJwt>();

@@ -6,7 +6,9 @@
 
   <!--
     A camada de Domínio é deliberadamente livre de dependências de infraestrutura.
-    Nenhum PackageReference é adicionado aqui: o modelo de domínio é POCO puro.
+    Nenhum PackageReference é adicionado aqui: o modelo de domínio é POCO puro. O único pacote
+    que o alcança é o analisador de APIs proibidas (src/Directory.Build.props), usado apenas na
+    compilação e ausente da montagem publicada.
   -->
 
 </Project>

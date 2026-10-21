@@ -1,0 +1,5 @@
+P:System.DateTimeOffset.UtcNow;Use RelogioDoDominio.Agora (domínio) ou IProvedorDeDataHora (demais camadas)
+P:System.DateTimeOffset.Now;Use RelogioDoDominio.Agora (domínio) ou IProvedorDeDataHora (demais camadas), sempre em UTC
+P:System.DateTime.UtcNow;Use RelogioDoDominio.Agora (domínio) ou IProvedorDeDataHora (demais camadas)
+P:System.DateTime.Now;Use RelogioDoDominio.Agora (domínio) ou IProvedorDeDataHora (demais camadas), sempre em UTC
+P:System.DateTime.Today;Use RelogioDoDominio.Agora (domínio) ou IProvedorDeDataHora (demais camadas)

@@ -39,7 +39,7 @@ public sealed class ItemPeca : Entity
         Quantidade = quantidade;
         Reservada = false;
         Consumida = false;
-        AdicionadoEm = DateTimeOffset.UtcNow;
+        AdicionadoEm = RelogioDoDominio.Agora;
     }
 
     public Guid OrdemServicoId { get; private set; }

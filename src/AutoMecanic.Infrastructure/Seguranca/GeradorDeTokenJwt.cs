@@ -16,7 +16,7 @@ namespace AutoMecanic.Infrastructure.Seguranca;
 /// criptografado</b> e pode ser lido por qualquer um que o intercepte.
 /// </para>
 /// </summary>
-public sealed class GeradorDeTokenJwt(IOptions<OpcoesDeJwt> opcoes) : IGeradorDeToken
+public sealed class GeradorDeTokenJwt(IOptions<OpcoesDeJwt> opcoes, IProvedorDeDataHora relogio) : IGeradorDeToken
 {
     private readonly OpcoesDeJwt _opcoes = opcoes.Value;
 
@@ -24,7 +24,7 @@ public sealed class GeradorDeTokenJwt(IOptions<OpcoesDeJwt> opcoes) : IGeradorDe
     {
         ArgumentNullException.ThrowIfNull(usuario);
 
-        var agora = DateTimeOffset.UtcNow;
+        var agora = relogio.Agora;
         var expiraEm = agora.AddMinutes(_opcoes.ValidadeEmMinutos);
 
         var reivindicacoes = new List<Claim>

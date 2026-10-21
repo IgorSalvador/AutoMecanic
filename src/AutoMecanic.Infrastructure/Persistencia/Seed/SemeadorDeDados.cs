@@ -39,6 +39,7 @@ public sealed class SemeadorDeDados(
     IServicoDeCatalogo servicoDeCatalogo,
     IServicoDeEstoque servicoDeEstoque,
     IServicoDeOrdensServico servicoDeOrdensServico,
+    IProvedorDeDataHora relogio,
     ILogger<SemeadorDeDados> logger)
 {
     /// <summary>
@@ -431,7 +432,7 @@ public sealed class SemeadorDeDados(
         var ordem = await contexto.OrdensDeServico.FirstAsync(o => o.Id == ordemId, cancellationToken);
         var entrada = contexto.Entry(ordem);
 
-        var abertura = DateTimeOffset.UtcNow.AddDays(-diasAtras);
+        var abertura = relogio.Agora.AddDays(-diasAtras);
         var inicioDaExecucao = abertura.AddHours(2);
         var finalizacao = inicioDaExecucao.Add(duracao);
         var entrega = finalizacao.AddHours(3);

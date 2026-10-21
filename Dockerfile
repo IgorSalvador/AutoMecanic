@@ -11,6 +11,7 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS restore
 WORKDIR /origem
 
 COPY Directory.Build.props Directory.Packages.props AutoMecanic.slnx ./
+COPY src/Directory.Build.props src/BannedSymbols.txt src/
 COPY src/AutoMecanic.Domain/AutoMecanic.Domain.csproj                 src/AutoMecanic.Domain/
 COPY src/AutoMecanic.Application/AutoMecanic.Application.csproj       src/AutoMecanic.Application/
 COPY src/AutoMecanic.Infrastructure/AutoMecanic.Infrastructure.csproj src/AutoMecanic.Infrastructure/

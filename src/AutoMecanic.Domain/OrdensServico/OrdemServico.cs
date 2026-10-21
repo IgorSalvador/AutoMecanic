@@ -57,7 +57,7 @@ public sealed class OrdemServico : AggregateRoot
         QuilometragemEntrada = quilometragemEntrada;
         ResponsavelId = responsavelId;
         Status = StatusOrdemServico.Recebida;
-        CriadaEm = DateTimeOffset.UtcNow;
+        CriadaEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>Número legível informado ao cliente (OS-AAAA-NNNNNN).</summary>
@@ -241,7 +241,7 @@ public sealed class OrdemServico : AggregateRoot
         }
 
         DiagnosticoTecnico = texto;
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new DiagnosticoRegistrado(Id, texto));
     }
@@ -269,7 +269,7 @@ public sealed class OrdemServico : AggregateRoot
         if (existente is not null)
         {
             existente.AlterarQuantidade(existente.Quantidade + quantidade);
-            AtualizadaEm = DateTimeOffset.UtcNow;
+            AtualizadaEm = RelogioDoDominio.Agora;
             RecalcularOrcamentoSeExistir();
 
             RegistrarEvento(new ServicoIncluidoNaOrdem(Id, existente.Id, servicoId, quantidade, existente.Subtotal.Valor));
@@ -280,7 +280,7 @@ public sealed class OrdemServico : AggregateRoot
         var item = ItemServico.Criar(Id, servicoId, descricao, precoUnitario, quantidade, tempoEstimadoEmMinutos);
 
         _itensServico.Add(item);
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
         RecalcularOrcamentoSeExistir();
 
         RegistrarEvento(new ServicoIncluidoNaOrdem(Id, item.Id, servicoId, quantidade, item.Subtotal.Valor));
@@ -306,7 +306,7 @@ public sealed class OrdemServico : AggregateRoot
         if (existente is not null)
         {
             existente.AlterarQuantidade(existente.Quantidade + quantidade);
-            AtualizadaEm = DateTimeOffset.UtcNow;
+            AtualizadaEm = RelogioDoDominio.Agora;
             RecalcularOrcamentoSeExistir();
 
             RegistrarEvento(new PecaIncluidaNaOrdem(Id, existente.Id, pecaId, quantidade, existente.Subtotal.Valor));
@@ -317,7 +317,7 @@ public sealed class OrdemServico : AggregateRoot
         var item = ItemPeca.Criar(Id, pecaId, codigoPeca, nomePeca, precoUnitario, quantidade);
 
         _itensPeca.Add(item);
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
         RecalcularOrcamentoSeExistir();
 
         RegistrarEvento(new PecaIncluidaNaOrdem(Id, item.Id, pecaId, quantidade, item.Subtotal.Valor));
@@ -356,7 +356,7 @@ public sealed class OrdemServico : AggregateRoot
             ?? throw new DomainException("ITEM_NAO_ENCONTRADO", "Item de serviço não encontrado na Ordem de Serviço.");
 
         _itensServico.Remove(item);
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
         RecalcularOrcamentoSeExistir();
 
         RegistrarEvento(new ItemRemovidoDaOrdem(Id, item.Id, false, item.ServicoId, item.Quantidade));
@@ -381,7 +381,7 @@ public sealed class OrdemServico : AggregateRoot
         }
 
         _itensPeca.Remove(item);
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
         RecalcularOrcamentoSeExistir();
 
         RegistrarEvento(new ItemRemovidoDaOrdem(Id, item.Id, true, item.PecaId, item.Quantidade));
@@ -398,7 +398,7 @@ public sealed class OrdemServico : AggregateRoot
         var quantidadeAnterior = item.Quantidade;
 
         item.AlterarQuantidade(novaQuantidade);
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
         RecalcularOrcamentoSeExistir();
 
         RegistrarEvento(new QuantidadeDeServicoAlterada(
@@ -442,7 +442,7 @@ public sealed class OrdemServico : AggregateRoot
             Orcamento.Recalcular(ValorTotalServicos, ValorTotalPecas, percentualDesconto);
         }
 
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new OrcamentoGerado(
             Id, Orcamento.Id, Orcamento.ValorServicos.Valor, Orcamento.ValorPecas.Valor, Orcamento.ValorTotal.Valor));
@@ -489,7 +489,7 @@ public sealed class OrdemServico : AggregateRoot
 
         orcamento.Aprovar();
 
-        ExecucaoIniciadaEm = DateTimeOffset.UtcNow;
+        ExecucaoIniciadaEm = RelogioDoDominio.Agora;
 
         AlterarStatus(StatusOrdemServico.EmExecucao, "Orçamento aprovado pelo cliente. Execução iniciada.", null);
 
@@ -582,7 +582,7 @@ public sealed class OrdemServico : AggregateRoot
             ?? throw new DomainException("ITEM_NAO_ENCONTRADO", "Item de peça não encontrado na Ordem de Serviço.");
 
         item.MarcarComoConsumida();
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>
@@ -595,7 +595,7 @@ public sealed class OrdemServico : AggregateRoot
             StatusOrdemServico.Finalizada,
             [StatusOrdemServico.EmExecucao]);
 
-        FinalizadaEm = DateTimeOffset.UtcNow;
+        FinalizadaEm = RelogioDoDominio.Agora;
 
         AlterarStatus(StatusOrdemServico.Finalizada, observacao ?? "Serviços concluídos. Veículo pronto para retirada.", responsavelId);
 
@@ -611,7 +611,7 @@ public sealed class OrdemServico : AggregateRoot
             StatusOrdemServico.Entregue,
             [StatusOrdemServico.Finalizada]);
 
-        EntregueEm = DateTimeOffset.UtcNow;
+        EntregueEm = RelogioDoDominio.Agora;
 
         AlterarStatus(StatusOrdemServico.Entregue, observacao ?? "Veículo entregue ao cliente.", responsavelId);
 
@@ -658,7 +658,7 @@ public sealed class OrdemServico : AggregateRoot
         }
 
         ResponsavelId = responsavelId;
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
     }
 
     // ---------------------------------------------------------------------
@@ -670,7 +670,7 @@ public sealed class OrdemServico : AggregateRoot
         var anterior = Status;
 
         Status = novoStatus;
-        AtualizadaEm = DateTimeOffset.UtcNow;
+        AtualizadaEm = RelogioDoDominio.Agora;
 
         RegistrarTransicao(anterior, novoStatus, observacao, usuarioId);
         RegistrarEvento(new StatusDaOrdemAlterado(Id, Numero.Valor, anterior, novoStatus));

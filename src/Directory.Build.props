@@ -1,0 +1,23 @@
+<Project>
+
+  <!-- Herda as definições da raiz da solução. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!--
+    Regras que valem só para o código de produção (src/), e não para os testes.
+
+    O analisador de APIs proibidas impede o uso direto do relógio do sistema: todo "agora"
+    vem do RelogioDoDominio (no domínio) ou do IProvedorDeDataHora (nas demais camadas), que
+    compartilham o mesmo TimeProvider. É o que torna determinísticos os testes de duração,
+    validade e bloqueio. O pacote é só de compilação: não chega à aplicação publicada.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" PrivateAssets="all" />
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <WarningsAsErrors>$(WarningsAsErrors);RS0030</WarningsAsErrors>
+  </PropertyGroup>
+
+</Project>

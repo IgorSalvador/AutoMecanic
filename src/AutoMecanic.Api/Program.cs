@@ -8,6 +8,7 @@ using AutoMecanic.Api.Middlewares;
 using AutoMecanic.Api.Servicos;
 using AutoMecanic.Application;
 using AutoMecanic.Application.Abstractions;
+using AutoMecanic.Domain.Abstractions;
 using AutoMecanic.Infrastructure;
 using AutoMecanic.Infrastructure.Persistencia;
 using AutoMecanic.Infrastructure.Persistencia.Seed;
@@ -276,6 +277,9 @@ builder.Services.AddSwaggerGen(opcoes =>
 });
 
 var app = builder.Build();
+
+// O domínio e a aplicação passam a compartilhar a mesma fonte de tempo do contêiner.
+RelogioDoDominio.Configurar(app.Services.GetRequiredService<TimeProvider>());
 
 // ---------------------------------------------------------------------------
 // Modo de migração: prepara o banco e encerra, sem subir o servidor HTTP.

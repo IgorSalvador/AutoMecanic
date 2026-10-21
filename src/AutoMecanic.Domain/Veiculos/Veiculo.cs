@@ -49,7 +49,7 @@ public sealed class Veiculo : AggregateRoot
         Cor = cor;
         Quilometragem = quilometragem;
         Ativo = true;
-        CadastradoEm = DateTimeOffset.UtcNow;
+        CadastradoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>Referência por identidade ao agregado Cliente (proprietário atual).</summary>
@@ -130,7 +130,7 @@ public sealed class Veiculo : AggregateRoot
         AnoFabricacao = anoFabricacao;
         AnoModelo = anoModelo;
         Cor = string.IsNullOrWhiteSpace(cor) ? null : cor.Trim();
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>
@@ -156,7 +156,7 @@ public sealed class Veiculo : AggregateRoot
 
         var anterior = Quilometragem;
         Quilometragem = novaQuilometragem;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new QuilometragemAtualizada(Id, anterior, novaQuilometragem));
     }
@@ -178,7 +178,7 @@ public sealed class Veiculo : AggregateRoot
 
         var anterior = ClienteId;
         ClienteId = novoClienteId;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new VeiculoTransferido(Id, anterior, novoClienteId));
     }
@@ -191,7 +191,7 @@ public sealed class Veiculo : AggregateRoot
         }
 
         Ativo = false;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new VeiculoInativado(Id, motivo ?? "Não informado"));
     }
@@ -204,7 +204,7 @@ public sealed class Veiculo : AggregateRoot
         }
 
         Ativo = true;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     public void GarantirVeiculoAtivo()
@@ -219,7 +219,7 @@ public sealed class Veiculo : AggregateRoot
 
     private static void ValidarAnos(int anoFabricacao, int anoModelo)
     {
-        var anoLimite = DateTimeOffset.UtcNow.Year + 1;
+        var anoLimite = RelogioDoDominio.Agora.Year + 1;
 
         if (anoFabricacao < AnoMinimoFabricacao || anoFabricacao > anoLimite)
         {

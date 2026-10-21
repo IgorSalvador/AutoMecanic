@@ -37,7 +37,7 @@ public sealed class ItemServico : Entity
         PrecoUnitario = precoUnitario;
         Quantidade = quantidade;
         TempoEstimadoEmMinutos = tempoEstimadoEmMinutos;
-        AdicionadoEm = DateTimeOffset.UtcNow;
+        AdicionadoEm = RelogioDoDominio.Agora;
     }
 
     public Guid OrdemServicoId { get; private set; }

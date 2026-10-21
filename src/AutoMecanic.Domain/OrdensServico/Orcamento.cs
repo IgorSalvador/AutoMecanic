@@ -40,7 +40,7 @@ public sealed class Orcamento : Entity
         PercentualDesconto = percentualDesconto;
         ValorTotal = valorTotal;
         Status = StatusOrcamento.EmElaboracao;
-        GeradoEm = DateTimeOffset.UtcNow;
+        GeradoEm = RelogioDoDominio.Agora;
     }
 
     public Guid OrdemServicoId { get; private set; }
@@ -150,7 +150,7 @@ public sealed class Orcamento : Entity
         }
 
         Status = StatusOrcamento.AguardandoAprovacao;
-        EnviadoEm = DateTimeOffset.UtcNow;
+        EnviadoEm = RelogioDoDominio.Agora;
         ValidoAte = EnviadoEm.Value.AddDays(validadeEmDias);
     }
 
@@ -159,7 +159,7 @@ public sealed class Orcamento : Entity
         GarantirAguardandoAprovacao();
 
         Status = StatusOrcamento.Aprovado;
-        RespondidoEm = DateTimeOffset.UtcNow;
+        RespondidoEm = RelogioDoDominio.Agora;
     }
 
     internal void Reprovar(string? motivo)
@@ -167,7 +167,7 @@ public sealed class Orcamento : Entity
         GarantirAguardandoAprovacao();
 
         Status = StatusOrcamento.Reprovado;
-        RespondidoEm = DateTimeOffset.UtcNow;
+        RespondidoEm = RelogioDoDominio.Agora;
         MotivoReprovacao = string.IsNullOrWhiteSpace(motivo) ? "Não informado pelo cliente" : motivo.Trim();
     }
 
@@ -181,7 +181,7 @@ public sealed class Orcamento : Entity
         }
 
         Status = StatusOrcamento.Expirado;
-        RespondidoEm = DateTimeOffset.UtcNow;
+        RespondidoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>

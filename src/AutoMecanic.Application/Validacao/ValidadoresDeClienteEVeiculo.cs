@@ -89,9 +89,7 @@ public sealed class ValidadorDeCriarVeiculo : AbstractValidator<CriarVeiculoRequ
         RuleFor(v => v.Marca).NotEmpty().MaximumLength(50);
         RuleFor(v => v.Modelo).NotEmpty().MaximumLength(80);
 
-        RuleFor(v => v.AnoFabricacao)
-            .InclusiveBetween(1900, DateTimeOffset.UtcNow.Year + 1)
-            .WithMessage($"O ano de fabricação deve estar entre 1900 e {DateTimeOffset.UtcNow.Year + 1}.");
+        RuleFor(v => v.AnoFabricacao).AnoDeFabricacaoValido();
 
         RuleFor(v => v.Cor).MaximumLength(30);
 
@@ -108,8 +106,8 @@ public sealed class ValidadorDeAtualizarVeiculo : AbstractValidator<AtualizarVei
     {
         RuleFor(v => v.Marca).NotEmpty().MaximumLength(50);
         RuleFor(v => v.Modelo).NotEmpty().MaximumLength(80);
-        RuleFor(v => v.AnoFabricacao).InclusiveBetween(1900, DateTimeOffset.UtcNow.Year + 1);
-        RuleFor(v => v.AnoModelo).InclusiveBetween(1900, DateTimeOffset.UtcNow.Year + 2);
+        RuleFor(v => v.AnoFabricacao).AnoDeFabricacaoValido();
+        RuleFor(v => v.AnoModelo).AnoDeModeloValido();
         RuleFor(v => v.Cor).MaximumLength(30);
     }
 }
