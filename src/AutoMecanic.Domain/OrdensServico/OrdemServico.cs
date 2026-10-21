@@ -363,8 +363,8 @@ public sealed class OrdemServico : AggregateRoot
     }
 
     /// <summary>
-    /// Remove um item de peça da OS. A liberação da reserva no estoque é feita pela camada
-    /// de aplicação, a partir do evento <see cref="ItemRemovidoDaOrdem"/>.
+    /// Remove um item de peça da OS. A liberação da reserva no estoque é responsabilidade da
+    /// camada de aplicação, que a executa na mesma transação antes de chamar este método.
     /// </summary>
     public void RemoverPeca(Guid itemPecaId)
     {
@@ -395,9 +395,14 @@ public sealed class OrdemServico : AggregateRoot
         var item = _itensServico.FirstOrDefault(i => i.Id == itemServicoId)
             ?? throw new DomainException("ITEM_NAO_ENCONTRADO", "Item de serviço não encontrado na Ordem de Serviço.");
 
+        var quantidadeAnterior = item.Quantidade;
+
         item.AlterarQuantidade(novaQuantidade);
         AtualizadaEm = DateTimeOffset.UtcNow;
         RecalcularOrcamentoSeExistir();
+
+        RegistrarEvento(new QuantidadeDeServicoAlterada(
+            Id, item.Id, item.ServicoId, quantidadeAnterior, item.Quantidade, item.Subtotal.Valor));
     }
 
     // ---------------------------------------------------------------------
@@ -633,7 +638,7 @@ public sealed class OrdemServico : AggregateRoot
             throw new DomainException("MOTIVO_OBRIGATORIO", "Informe o motivo do cancelamento.");
         }
 
-        Orcamento?.ReabrirParaEdicao();
+        Orcamento?.Cancelar();
 
         MotivoCancelamento = motivo.Trim();
 

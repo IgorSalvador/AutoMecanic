@@ -323,6 +323,21 @@ public sealed class ServicoDeOrdensServicoTests
     }
 
     [Fact]
+    public async Task AcompanharAsync_ComOrdemCanceladaAntesDoEnvio_NaoExpoeOValor()
+    {
+        var (ordem, _) = OrdemComOrcamentoGerado();
+        ordem.Cancelar("Cliente desistiu antes do orçamento");
+
+        _ordens.ObterPorNumeroAsync(ordem.Numero.Valor, Arg.Any<CancellationToken>()).Returns(ordem);
+
+        var resposta = await _servico.AcompanharAsync(ordem.Numero.Valor, CpfValido);
+
+        // Cancelado antes do envio, o orçamento nunca deixou de ser rascunho interno.
+        resposta.ValorOrcamento.ShouldBeNull();
+        resposta.SituacaoOrcamento.ShouldBeNull();
+    }
+
+    [Fact]
     public async Task AcompanharAsync_ComDocumentoInvalido_LancaValidacao() =>
         await Should.ThrowAsync<ValidacaoException>(() =>
             _servico.AcompanharAsync("OS-2026-000001", "00000000000"));

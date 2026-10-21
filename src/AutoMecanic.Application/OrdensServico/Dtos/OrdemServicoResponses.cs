@@ -292,9 +292,9 @@ public sealed record AcompanhamentoResponse
 
     public static AcompanhamentoResponse De(OrdemServico ordem, string descricaoVeiculo)
     {
-        // O orçamento só é revelado depois de enviado: enquanto está em elaboração,
-        // é rascunho interno da oficina.
-        var orcamentoVisivel = ordem.Orcamento is { Status: not StatusOrcamento.EmElaboracao }
+        // O orçamento só é revelado se chegou a ser enviado: enquanto está em elaboração,
+        // é rascunho interno da oficina — e continua sendo se a OS for cancelada antes do envio.
+        var orcamentoVisivel = ordem.Orcamento is { EnviadoEm: not null }
             ? ordem.Orcamento
             : null;
 

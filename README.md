@@ -171,7 +171,6 @@ GET /api/v1/acompanhamento?numero=OS-2026-000001&documento=11144477735
 | [Modelo de Domínio](docs/04-modelo-de-dominio.md) | Agregados, entidades, objetos de valor e invariantes |
 | [Arquitetura](docs/05-arquitetura.md) | Camadas e as decisões técnicas, com seus custos |
 | [Relatório de segurança](docs/06-relatorio-de-seguranca.md) | Análise de vulnerabilidades e OWASP API Top 10 |
-| [Roteiro do vídeo](docs/07-roteiro-do-video.md) | Demonstração de 15 minutos, passo a passo |
 | [Documento de entrega](docs/ENTREGA.md) | Modelo para exportação em PDF |
 | [Coleção Postman](postman/README.md) | Como importar, executar e regerar a coleção |
 

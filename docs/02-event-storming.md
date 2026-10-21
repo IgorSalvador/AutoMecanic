@@ -499,7 +499,8 @@ flowchart TB
 | `OrdemDeServicoAberta` | Ordem de Serviço | Recepção | Painel operacional |
 | `DiagnosticoIniciado` / `DiagnosticoRegistrado` | Ordem de Serviço | Mecânico | Acompanhamento |
 | `ServicoIncluidoNaOrdem` / `PecaIncluidaNaOrdem` | Ordem de Serviço | Composição do orçamento | Recálculo do orçamento |
-| `ItemRemovidoDaOrdem` | Ordem de Serviço | Remoção de item | Liberação de reserva |
+| `QuantidadeDeServicoAlterada` | Ordem de Serviço | Ajuste de quantidade | Recálculo do orçamento |
+| `ItemRemovidoDaOrdem` | Ordem de Serviço | Remoção de item | Auditoria (a reserva é liberada pela aplicação na mesma transação) |
 | `OrcamentoGerado` | Ordem de Serviço | Cálculo automático | Orçamento do cliente |
 | `OrcamentoEnviadoAoCliente` | Ordem de Serviço | Envio ao cliente | Notificação; congelamento de itens |
 | `OrcamentoAprovadoPeloCliente` | Ordem de Serviço | Decisão do cliente | **Consumo das reservas** |

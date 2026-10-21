@@ -53,7 +53,13 @@ public enum StatusOrcamento
     Reprovado = 4,
 
     /// <summary>Expirou sem decisão do cliente.</summary>
-    Expirado = 5
+    Expirado = 5,
+
+    /// <summary>
+    /// A Ordem de Serviço foi cancelada antes de o cliente responder. Datas de envio e validade
+    /// são preservadas, para que fique registrado o que chegou a ser apresentado.
+    /// </summary>
+    Cancelado = 6
 }
 
 /// <summary>Métodos de apoio à máquina de estados da Ordem de Serviço.</summary>

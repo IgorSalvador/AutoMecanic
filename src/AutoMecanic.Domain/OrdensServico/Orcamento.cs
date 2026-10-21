@@ -184,6 +184,23 @@ public sealed class Orcamento : Entity
         RespondidoEm = DateTimeOffset.UtcNow;
     }
 
+    /// <summary>
+    /// Encerra o orçamento junto com o cancelamento da OS. Diferente de
+    /// <see cref="ReabrirParaEdicao"/>, não apaga as datas de envio e validade: o histórico do
+    /// que foi apresentado ao cliente permanece.
+    /// </summary>
+    internal void Cancelar()
+    {
+        if (Status is not (StatusOrcamento.EmElaboracao or StatusOrcamento.AguardandoAprovacao))
+        {
+            throw new DomainException(
+                "ORCAMENTO_NAO_CANCELAVEL",
+                $"Um orçamento com situação '{Status}' não pode ser cancelado.");
+        }
+
+        Status = StatusOrcamento.Cancelado;
+    }
+
     /// <summary>Reabre o orçamento para edição quando a OS retorna ao diagnóstico.</summary>
     internal void ReabrirParaEdicao()
     {

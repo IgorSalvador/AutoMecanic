@@ -4,7 +4,7 @@ namespace AutoMecanic.Domain.OrdensServico.Events;
 
 // Cada evento abaixo corresponde a um post-it laranja do Event Storming e é nomeado no
 // passado, como um fato consumado do negócio. A correspondência com o quadro completo está
-// documentada em docs/01-event-storming.md.
+// documentada em docs/02-event-storming.md.
 
 /// <summary>O veículo foi recebido e a Ordem de Serviço foi aberta.</summary>
 public sealed record OrdemDeServicoAberta(
@@ -25,6 +25,15 @@ public sealed record ServicoIncluidoNaOrdem(
     Guid ItemId,
     Guid ServicoId,
     int Quantidade,
+    decimal Subtotal) : DomainEvent;
+
+/// <summary>A quantidade de um serviço já incluído na OS foi alterada.</summary>
+public sealed record QuantidadeDeServicoAlterada(
+    Guid OrdemServicoId,
+    Guid ItemId,
+    Guid ServicoId,
+    int QuantidadeAnterior,
+    int QuantidadeAtual,
     decimal Subtotal) : DomainEvent;
 
 /// <summary>Uma peça foi incluída na OS. Dispara a reserva no estoque.</summary>
