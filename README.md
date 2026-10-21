@@ -293,6 +293,11 @@ A própria API também prepara o banco, em dois modos:
   Job de migração no Kubernetes, onde várias réplicas não podem migrar ao mesmo tempo. Pode ser
   reexecutado sem efeito colateral.
 
+Pelo mesmo mecanismo, `dotnet AutoMecanic.Api.dll --expirar-orcamentos` expira os orçamentos
+vencidos, devolve as reservas de peça ao estoque e encerra. É o comando do CronJob de
+manutenção; o endpoint `POST /api/v1/ordens-servico/manutencao/expirar-orcamentos` continua
+disponível para acionamento manual.
+
 ---
 
 ## Configuração

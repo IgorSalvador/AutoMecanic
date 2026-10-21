@@ -440,8 +440,9 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Quantidade de orçamentos expirados.</response>
     /// <remarks>
-    /// Rotina de manutenção, destinada a ser acionada por um agendador. Libera as reservas
-    /// de peça presas em orçamentos que o cliente nunca respondeu.
+    /// Rotina de manutenção que libera as reservas de peça presas em orçamentos que o cliente
+    /// nunca respondeu. No Kubernetes, ela roda pelo CronJob (<c>--expirar-orcamentos</c>);
+    /// este endpoint permite o acionamento manual.
     /// </remarks>
     [HttpPost("manutencao/expirar-orcamentos")]
     [Authorize(Policy = PoliticasDeAutorizacao.Administrar)]

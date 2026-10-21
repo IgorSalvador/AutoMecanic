@@ -282,23 +282,14 @@ var app = builder.Build();
 RelogioDoDominio.Configurar(app.Services.GetRequiredService<TimeProvider>());
 
 // ---------------------------------------------------------------------------
-// Modo de migração: prepara o banco e encerra, sem subir o servidor HTTP.
+// Tarefas avulsas (--migrar, --expirar-orcamentos): executam e encerram, sem subir o
+// servidor HTTP. São os comandos dos Jobs e CronJobs do Kubernetes.
 // ---------------------------------------------------------------------------
-if (modo == ModoDeExecucao.Migrar)
+if (modo != ModoDeExecucao.Servidor)
 {
     await using (app)
     {
-        try
-        {
-            await PreparadorDoBancoDeDados.ExecutarAsync(app.Services, app.Configuration);
-            return 0;
-        }
-        catch (Exception)
-        {
-            // O preparador já registrou a falha. O código de saída diferente de zero é o que
-            // faz o Job do Kubernetes tentar de novo e, esgotadas as tentativas, falhar o deploy.
-            return 1;
-        }
+        return await TarefasAvulsas.ExecutarAsync(modo, app.Services, app.Configuration);
     }
 }
 

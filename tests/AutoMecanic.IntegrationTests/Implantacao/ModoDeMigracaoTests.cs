@@ -65,4 +65,18 @@ public sealed class ArgumentosDeExecucaoTests
         // O argumento de modo não pode chegar ao provedor de configuração; os demais, sim.
         restantes.ShouldBe(["--urls=http://+:8080"]);
     }
+
+    [Fact]
+    public void Interpretar_ComExpirarOrcamentos_AtivaOModo()
+    {
+        var (modo, restantes) = ArgumentosDeExecucao.Interpretar(["--expirar-orcamentos"]);
+
+        modo.ShouldBe(ModoDeExecucao.ExpirarOrcamentos);
+        restantes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Interpretar_ComDoisModos_Rejeita() =>
+        Should.Throw<ArgumentException>(() =>
+            ArgumentosDeExecucao.Interpretar(["--migrar", "--expirar-orcamentos"]));
 }
