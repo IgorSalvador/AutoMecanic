@@ -63,7 +63,9 @@ O valor apresentado ao cliente para aprovação, **calculado automaticamente** a
 serviços e peças incluídos na OS. Nunca é digitado.
 
 Tem situação própria, independente da OS: *Em elaboração* (rascunho interno da oficina),
-*Aguardando aprovação* (já enviado), *Aprovado*, *Reprovado* ou *Expirado*.
+*Aguardando aprovação* (já enviado), *Aprovado*, *Reprovado*, *Expirado* ou *Cancelado*
+(a OS foi cancelada antes da resposta do cliente; as datas de envio e validade ficam
+registradas).
 
 **Regra que a palavra carrega:** depois de **enviado**, o orçamento é um compromisso. Os
 itens da OS ficam congelados — o cliente aprova exatamente o que viu. Mudar o escopo exige

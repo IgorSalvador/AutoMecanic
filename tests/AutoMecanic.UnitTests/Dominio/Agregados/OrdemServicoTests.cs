@@ -260,6 +260,20 @@ public sealed class OrdemServicoTests
         ordem.ValorTotalServicos.Valor.ShouldBe(360m);
     }
 
+    [Fact]
+    public void AlterarQuantidadeDeServico_RegistraEventoComQuantidadesAnteriorEAtual()
+    {
+        var ordem = Abrir();
+        var item = ordem.AdicionarServico(ServicoId, "Troca de óleo", 120m, 1, 45);
+
+        ordem.AlterarQuantidadeDeServico(item.Id, 3);
+
+        var evento = ordem.EventosDeDominio.OfType<QuantidadeDeServicoAlterada>().ShouldHaveSingleItem();
+        evento.QuantidadeAnterior.ShouldBe(1);
+        evento.QuantidadeAtual.ShouldBe(3);
+        evento.Subtotal.ShouldBe(360m);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(1000)]
@@ -461,6 +475,34 @@ public sealed class OrdemServicoTests
 
         ordem.Status.ShouldBe(StatusOrdemServico.Cancelada);
         ordem.MotivoCancelamento.ShouldBe("Cliente desistiu");
+    }
+
+    [Fact]
+    public void Cancelar_ComOrcamentoEnviado_PreservaDatasDeEnvioEValidade()
+    {
+        var ordem = ComOrcamentoEnviado();
+        var enviadoEm = ordem.Orcamento!.EnviadoEm;
+        var validoAte = ordem.Orcamento.ValidoAte;
+
+        ordem.Cancelar("Cliente desistiu");
+
+        // O registro do que foi apresentado ao cliente não pode sumir com o cancelamento.
+        ordem.Orcamento.Status.ShouldBe(StatusOrcamento.Cancelado);
+        ordem.Orcamento.EnviadoEm.ShouldNotBeNull();
+        ordem.Orcamento.EnviadoEm.ShouldBe(enviadoEm);
+        ordem.Orcamento.ValidoAte.ShouldBe(validoAte);
+    }
+
+    [Fact]
+    public void Cancelar_ComOrcamentoEmElaboracao_MarcaCanceladoSemDataDeEnvio()
+    {
+        var ordem = ComItens();
+        ordem.GerarOrcamento();
+
+        ordem.Cancelar("Cliente desistiu");
+
+        ordem.Orcamento!.Status.ShouldBe(StatusOrcamento.Cancelado);
+        ordem.Orcamento.EnviadoEm.ShouldBeNull();
     }
 
     [Fact]

@@ -72,8 +72,9 @@ builder.Services
         opcoes.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
 
-// A validação do ModelState do MVC é desligada porque o FiltroDeValidacao já responde
-// no formato ProblemDetails padronizado pela API.
+// A validação automática do ModelState continua ligada, de propósito: ela responde 400 a
+// erros de desserialização (JSON malformado, tipo incompatível), que acontecem antes de
+// existir um objeto para o FiltroDeValidacao validar. As regras de contrato ficam com ele.
 builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(opcoes =>
     opcoes.SuppressModelStateInvalidFilter = false);
 

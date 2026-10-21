@@ -52,9 +52,9 @@ public static class DependencyInjection
                     errorCodesToAdd: null);
             });
 
-            // Consultas não rastreadas por padrão: a maioria das operações é leitura para
-            // projeção em DTO. Os casos de uso que alteram estado pedem rastreamento
-            // explicitamente ao carregar o agregado pelo repositório.
+            // Rastreamento ligado por padrão: os casos de uso carregam o agregado e o alteram
+            // em seguida, e esquecer o rastreamento faria a alteração sumir em silêncio. As
+            // consultas que só projetam para DTO desligam-no explicitamente com AsNoTracking.
             opcoes.UseQueryTrackingBehavior(QueryTrackingBehavior.TrackAll);
         });
 
