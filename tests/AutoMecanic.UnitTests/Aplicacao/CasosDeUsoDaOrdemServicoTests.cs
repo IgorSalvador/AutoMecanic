@@ -41,6 +41,8 @@ public sealed class CasosDeUsoDaOrdemServicoTests
     private readonly ReprovarOrcamento _reprovarOrcamento;
     private readonly CancelarOrdemServico _cancelar;
     private readonly AcompanharOrdemServico _acompanhar;
+    private readonly AprovarOrcamentoPeloCliente _aprovarPeloCliente;
+    private readonly ReprovarOrcamentoPeloCliente _reprovarPeloCliente;
     private readonly ExpirarOrcamentosVencidos _expirar;
 
     public CasosDeUsoDaOrdemServicoTests()
@@ -53,10 +55,15 @@ public sealed class CasosDeUsoDaOrdemServicoTests
         _unitOfWork
             .ExecutarEmTransacaoAsync(Arg.Any<Func<CancellationToken, Task<OrdemServicoResponse>>>(), Arg.Any<CancellationToken>())
             .Returns(chamada => chamada.Arg<Func<CancellationToken, Task<OrdemServicoResponse>>>()(CancellationToken.None));
+        _unitOfWork
+            .ExecutarEmTransacaoAsync(Arg.Any<Func<CancellationToken, Task<AcompanhamentoResponse>>>(), Arg.Any<CancellationToken>())
+            .Returns(chamada => chamada.Arg<Func<CancellationToken, Task<AcompanhamentoResponse>>>()(CancellationToken.None));
 
         var operacao = new OperacaoSobreOrdemServico(_ordens, _clientes, _veiculos, _unitOfWork);
         var reservas = new ReservasDaOrdemServico(_pecas);
         var composicao = new ComposicaoDaOrdemServico(_servicos, _pecas);
+        var decisao = new DecisaoDoOrcamento(reservas);
+        var acesso = new AcessoDoTitular(_ordens, _clientes, _veiculos);
         var abertura = new AberturaDeOrdemServico(
             _ordens, _gerador, _usuarioAtual, _relogio, NullLogger<AberturaDeOrdemServico>.Instance);
 
@@ -65,10 +72,14 @@ public sealed class CasosDeUsoDaOrdemServicoTests
         _adicionarServico = new AdicionarServicoNaOrdem(operacao, _servicos);
         _adicionarPeca = new AdicionarPecaNaOrdem(operacao, composicao, _pecas, _unitOfWork, NullLogger<AdicionarPecaNaOrdem>.Instance);
         _removerPeca = new RemoverPecaDaOrdem(operacao, _pecas, _unitOfWork);
-        _aprovarOrcamento = new AprovarOrcamento(operacao, reservas, _unitOfWork, NullLogger<AprovarOrcamento>.Instance);
-        _reprovarOrcamento = new ReprovarOrcamento(operacao, reservas, _unitOfWork, NullLogger<ReprovarOrcamento>.Instance);
+        _aprovarOrcamento = new AprovarOrcamento(operacao, decisao, _unitOfWork, NullLogger<AprovarOrcamento>.Instance);
+        _reprovarOrcamento = new ReprovarOrcamento(operacao, decisao, _unitOfWork, NullLogger<ReprovarOrcamento>.Instance);
         _cancelar = new CancelarOrdemServico(operacao, reservas, _usuarioAtual, _unitOfWork);
-        _acompanhar = new AcompanharOrdemServico(_ordens, _clientes, _veiculos);
+        _acompanhar = new AcompanharOrdemServico(acesso);
+        _aprovarPeloCliente = new AprovarOrcamentoPeloCliente(
+            acesso, decisao, _ordens, _unitOfWork, NullLogger<AprovarOrcamentoPeloCliente>.Instance);
+        _reprovarPeloCliente = new ReprovarOrcamentoPeloCliente(
+            acesso, decisao, _ordens, _unitOfWork, NullLogger<ReprovarOrcamentoPeloCliente>.Instance);
         _expirar = new ExpirarOrcamentosVencidos(_ordens, reservas, _relogio, _unitOfWork, NullLogger<ExpirarOrcamentosVencidos>.Instance);
     }
 
@@ -416,6 +427,55 @@ public sealed class CasosDeUsoDaOrdemServicoTests
     public async Task AcompanharAsync_ComDocumentoInvalido_LancaValidacao() =>
         await Should.ThrowAsync<ValidacaoException>(() =>
             _acompanhar.ExecutarAsync("OS-2026-000001", "00000000000"));
+
+    // -----------------------------------------------------------------
+    // Resposta do próprio cliente ao orçamento
+    // -----------------------------------------------------------------
+
+    [Fact]
+    public async Task AprovarPeloCliente_ComNumeroEDocumentoDoTitular_IniciaExecucaoEBaixaAsPecas()
+    {
+        var (ordem, peca) = OrdemComOrcamentoEnviado();
+        _ordens.ObterPorNumeroAsync(ordem.Numero.Valor, Arg.Any<CancellationToken>()).Returns(ordem);
+
+        var resposta = await _aprovarPeloCliente.ExecutarAsync(new RespostaAoOrcamentoRequest(ordem.Numero.Valor, CpfValido));
+
+        resposta.Status.ShouldBe(StatusOrdemServico.EmExecucao);
+        peca.QuantidadeReservada.ShouldBe(0);
+        peca.QuantidadeEmEstoque.ShouldBe(7);
+        await _unitOfWork.Received(1).SalvarAlteracoesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AprovarPeloCliente_ComDocumentoDeOutraPessoa_NaoEncontraENaoAltera()
+    {
+        var (ordem, peca) = OrdemComOrcamentoEnviado();
+        _ordens.ObterPorNumeroAsync(ordem.Numero.Valor, Arg.Any<CancellationToken>()).Returns(ordem);
+
+        var excecao = await Should.ThrowAsync<RecursoNaoEncontradoException>(() =>
+            _aprovarPeloCliente.ExecutarAsync(new RespostaAoOrcamentoRequest(ordem.Numero.Valor, "11144477735")));
+
+        // Mesma mensagem de uma OS inexistente: não revela que o número existe.
+        excecao.Message.ShouldBe(AcessoDoTitular.MensagemDeNaoEncontrada);
+        ordem.Status.ShouldBe(StatusOrdemServico.AguardandoAprovacao);
+        peca.QuantidadeReservada.ShouldBe(3);
+        await _unitOfWork.DidNotReceive().SalvarAlteracoesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReprovarPeloCliente_CancelaAOSEDevolveAsReservas()
+    {
+        var (ordem, peca) = OrdemComOrcamentoEnviado();
+        _ordens.ObterPorNumeroAsync(ordem.Numero.Valor, Arg.Any<CancellationToken>()).Returns(ordem);
+
+        var resposta = await _reprovarPeloCliente.ExecutarAsync(
+            new RecusaDoOrcamentoRequest(ordem.Numero.Valor, CpfValido, "Vou pensar melhor."));
+
+        resposta.Status.ShouldBe(StatusOrdemServico.Cancelada);
+        ordem.Orcamento!.MotivoReprovacao.ShouldBe("Vou pensar melhor.");
+        peca.QuantidadeReservada.ShouldBe(0);
+        peca.QuantidadeEmEstoque.ShouldBe(10);
+    }
 
     // -----------------------------------------------------------------
     // Expiração

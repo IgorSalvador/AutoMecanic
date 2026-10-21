@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using AutoMecanic.Api;
 using AutoMecanic.Api.Configuracao;
+using AutoMecanic.Api.Controllers;
 using AutoMecanic.Api.Filtros;
 using AutoMecanic.Api.Middlewares;
 using AutoMecanic.Api.Servicos;
@@ -151,6 +152,7 @@ builder.Services.AddAuthorization(opcoes =>
 // o valor em produção não deveria exigir recompilação.
 var limiteDeLogin = builder.Configuration.GetValue("LimiteDeTaxa:LoginPorMinuto", 10);
 var limiteGlobal = builder.Configuration.GetValue("LimiteDeTaxa:GlobalPorMinuto", 300);
+var limiteDoCliente = builder.Configuration.GetValue("LimiteDeTaxa:ClientePorMinuto", 30);
 
 builder.Services.AddRateLimiter(opcoes =>
 {
@@ -163,6 +165,18 @@ builder.Services.AddRateLimiter(opcoes =>
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = limiteDeLogin,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        }));
+
+    // Autoatendimento do cliente (acompanhamento e resposta ao orçamento): anônimo e protegido
+    // pelo par número + documento, cujo segredo é o documento. O limite próprio impede tentar
+    // documentos em sequência contra um número de OS conhecido.
+    opcoes.AddPolicy(AcompanhamentoController.PoliticaDeTaxaDoCliente, contexto => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: contexto.Connection.RemoteIpAddress?.ToString() ?? "desconhecido",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = limiteDoCliente,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         }));
