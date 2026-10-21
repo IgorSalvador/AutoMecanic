@@ -14,7 +14,6 @@ using AutoMecanic.Infrastructure.Persistencia.Seed;
 using AutoMecanic.Infrastructure.Seguranca;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Serilog;
@@ -26,7 +25,9 @@ if (VerificacaoDeSaudeDoContainer.FoiSolicitada(args))
     return await VerificacaoDeSaudeDoContainer.ExecutarAsync();
 }
 
-var builder = WebApplication.CreateBuilder(args);
+var (modo, argumentosDoHost) = ArgumentosDeExecucao.Interpretar(args);
+
+var builder = WebApplication.CreateBuilder(argumentosDoHost);
 
 // O Kestrel escreve o cabeçalho "Server: Kestrel" no momento do flush, depois de qualquer
 // middleware. Desligá-lo na origem é a única forma de a resposta não anunciar o servidor.
@@ -277,6 +278,27 @@ builder.Services.AddSwaggerGen(opcoes =>
 var app = builder.Build();
 
 // ---------------------------------------------------------------------------
+// Modo de migração: prepara o banco e encerra, sem subir o servidor HTTP.
+// ---------------------------------------------------------------------------
+if (modo == ModoDeExecucao.Migrar)
+{
+    await using (app)
+    {
+        try
+        {
+            await PreparadorDoBancoDeDados.ExecutarAsync(app.Services, app.Configuration);
+            return 0;
+        }
+        catch (Exception)
+        {
+            // O preparador já registrou a falha. O código de saída diferente de zero é o que
+            // faz o Job do Kubernetes tentar de novo e, esgotadas as tentativas, falhar o deploy.
+            return 1;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Pipeline
 // ---------------------------------------------------------------------------
 
@@ -335,63 +357,18 @@ app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
 
 // ---------------------------------------------------------------------------
 // Preparação do banco na inicialização
+//
+// Ligada por padrão para o docker-compose, em que há uma única instância. No Kubernetes,
+// com várias réplicas sob o HPA, fica desligada: quem migra é o Job, com "--migrar".
 // ---------------------------------------------------------------------------
-await PrepararBancoDeDadosAsync(app);
+if (app.Configuration.GetValue("BancoDeDados:MigrarNaInicializacao", true))
+{
+    await PreparadorDoBancoDeDados.ExecutarAsync(app.Services, app.Configuration);
+}
 
 await app.RunAsync();
 
 return 0;
-
-// Aplica as migrações pendentes e executa a carga inicial de dados.
-//
-// Migrar na inicialização é adequado a este MVP em contêiner, em que a API é a única
-// escritora do esquema. Em um cenário com múltiplas réplicas, este passo migraria para um
-// job de implantação dedicado, para que duas instâncias não tentem migrar ao mesmo tempo.
-static async Task PrepararBancoDeDadosAsync(WebApplication aplicacao)
-{
-    if (!aplicacao.Configuration.GetValue("BancoDeDados:MigrarNaInicializacao", true))
-    {
-        return;
-    }
-
-    using var escopo = aplicacao.Services.CreateScope();
-    var logger = escopo.ServiceProvider.GetRequiredService<ILogger<Program>>();
-
-    try
-    {
-        var contexto = escopo.ServiceProvider.GetRequiredService<AutoMecanicDbContext>();
-
-        logger.LogInformation("Aplicando migrações pendentes...");
-        await contexto.Database.MigrateAsync();
-
-        if (!aplicacao.Configuration.GetValue("BancoDeDados:SemearDados", true))
-        {
-            return;
-        }
-
-        var senhaDoAdministrador = aplicacao.Configuration["Seed:SenhaDoAdministrador"];
-
-        if (string.IsNullOrWhiteSpace(senhaDoAdministrador))
-        {
-            logger.LogWarning(
-                "Seed ignorado: defina Seed__SenhaDoAdministrador para criar o usuário administrador inicial.");
-            return;
-        }
-
-        var semeador = escopo.ServiceProvider.GetRequiredService<SemeadorDeDados>();
-
-        await semeador.ExecutarAsync(
-            senhaDoAdministrador,
-            aplicacao.Configuration.GetValue("Seed:IncluirDadosDeDemonstracao", false));
-
-        logger.LogInformation("Banco de dados pronto.");
-    }
-    catch (Exception excecao)
-    {
-        logger.LogCritical(excecao, "Falha ao preparar o banco de dados. A aplicação não pode iniciar.");
-        throw;
-    }
-}
 
 /// <summary>
 /// Exposto para que os testes de integração possam instanciar a aplicação com

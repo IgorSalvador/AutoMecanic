@@ -284,6 +284,15 @@ dotnet dotnet-ef database update \
   --startup-project src/AutoMecanic.Infrastructure
 ```
 
+A própria API também prepara o banco, em dois modos:
+
+- **Na inicialização**, com `BancoDeDados__MigrarNaInicializacao=true` (padrão do
+  docker-compose, em que há uma única instância).
+- **Como tarefa avulsa**, com `dotnet AutoMecanic.Api.dll --migrar`: aplica as migrações,
+  executa a carga inicial e encerra, com código de saída 0 em caso de sucesso. É o comando do
+  Job de migração no Kubernetes, onde várias réplicas não podem migrar ao mesmo tempo. Pode ser
+  reexecutado sem efeito colateral.
+
 ---
 
 ## Configuração
