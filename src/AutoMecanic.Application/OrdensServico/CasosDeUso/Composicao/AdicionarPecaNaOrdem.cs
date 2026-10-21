@@ -12,6 +12,7 @@ namespace AutoMecanic.Application.OrdensServico.CasosDeUso;
 /// </summary>
 public sealed class AdicionarPecaNaOrdem(
     OperacaoSobreOrdemServico operacao,
+    ComposicaoDaOrdemServico composicao,
     IRepositorioDePecas repositorioDePecas,
     IUnitOfWork unitOfWork,
     ILogger<AdicionarPecaNaOrdem> logger)
@@ -30,22 +31,8 @@ public sealed class AdicionarPecaNaOrdem(
             var peca = await repositorioDePecas.ObterPorIdAsync(requisicao.PecaId, ct)
                 ?? throw new RecursoNaoEncontradoException("Peça", requisicao.PecaId);
 
-            peca.GarantirPecaAtiva();
+            composicao.IncluirPeca(ordem, peca, requisicao.Quantidade);
 
-            // A ordem importa: reservar primeiro faz a operação inteira falhar por falta de
-            // saldo antes de qualquer alteração na OS, mantendo os dois agregados coerentes.
-            peca.Reservar(requisicao.Quantidade, ordem.Id);
-
-            var item = ordem.AdicionarPeca(
-                peca.Id,
-                peca.Codigo,
-                peca.Nome,
-                peca.PrecoUnitario.Valor,
-                requisicao.Quantidade);
-
-            ordem.ConfirmarReservaDePeca(item.Id);
-
-            repositorioDePecas.Atualizar(peca);
             await operacao.PersistirAsync(ordem, ct);
 
             logger.LogInformation("Peça {Codigo} x{Quantidade} reservada para a OS {Numero}.",

@@ -202,6 +202,42 @@ public sealed class ValidadoresTests
     }
 
     [Fact]
+    public void ValidadorDeReceberVeiculo_ComItensValidos_NaoAcusaErro() =>
+        Validar(new ValidadorDeReceberVeiculo(), Recepcao(
+                servicos: [new AdicionarServicoRequest(Guid.CreateVersion7(), 1)],
+                pecas: [new AdicionarPecaRequest(Guid.CreateVersion7(), 4), new AdicionarPecaRequest(Guid.CreateVersion7(), 1)]))
+            .ShouldBeEmpty();
+
+    [Fact]
+    public void ValidadorDeReceberVeiculo_ComItemRepetido_PedeAjusteDeQuantidade()
+    {
+        var pecaId = Guid.CreateVersion7();
+
+        Validar(new ValidadorDeReceberVeiculo(), Recepcao(
+                pecas: [new AdicionarPecaRequest(pecaId, 1), new AdicionarPecaRequest(pecaId, 2)]))
+            .ShouldContain(e => e.Contains("Pecas") && e.Contains("mais de uma vez"));
+    }
+
+    [Fact]
+    public void ValidadorDeReceberVeiculo_ComQuantidadeInvalidaNoItem_AcusaOItem() =>
+        Validar(new ValidadorDeReceberVeiculo(), Recepcao(
+                servicos: [new AdicionarServicoRequest(Guid.CreateVersion7(), 0)]))
+            .ShouldContain(e => e.Contains("Servicos[0].Quantidade"));
+
+    [Fact]
+    public void ValidadorDeReceberVeiculo_ComItensDemais_AcusaOLimite() =>
+        Validar(new ValidadorDeReceberVeiculo(), Recepcao(
+                servicos: [.. Enumerable.Range(0, ValidadorDeReceberVeiculo.MaximoDeItensNaAbertura + 1)
+                    .Select(_ => new AdicionarServicoRequest(Guid.CreateVersion7(), 1))]))
+            .ShouldContain(e => e.Contains("no máximo"));
+
+    private static ReceberVeiculoRequest Recepcao(
+        IReadOnlyList<AdicionarServicoRequest>? servicos = null,
+        IReadOnlyList<AdicionarPecaRequest>? pecas = null) =>
+        new("52998224725", "Maria", "m@e.com", "11987654321",
+            "ABC1D23", "VW", "Gol", 2020, 2021, "Branco", "Barulho", 50_000, servicos, pecas);
+
+    [Fact]
     public void ValidadorDeRegistrarDiagnostico_ComTextoVazio_AcusaOCampo() =>
         Validar(new ValidadorDeRegistrarDiagnostico(), new RegistrarDiagnosticoRequest(""))
             .ShouldNotBeEmpty();

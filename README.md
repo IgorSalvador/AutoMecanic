@@ -110,7 +110,9 @@ flowchart LR
 ```
 
 **1 · Recepção** — identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o veículo pela
-placa e abre a OS, tudo em uma chamada:
+placa, abre a OS e, se informados, já inclui os serviços e reserva as peças, tudo em uma
+chamada. A resposta `201` traz o `id` e o `numero` da OS. Faltando saldo de uma peça, nada
+é gravado:
 
 ```http
 POST /api/v1/ordens-servico/recepcao
@@ -123,7 +125,9 @@ POST /api/v1/ordens-servico/recepcao
   "marca": "Toyota", "modelo": "Corolla",
   "anoFabricacao": 2021, "anoModelo": 2022,
   "descricaoProblema": "Ruído metálico ao frear em baixa velocidade.",
-  "quilometragemEntrada": 42000
+  "quilometragemEntrada": 42000,
+  "servicos": [{ "servicoId": "<id do serviço>", "quantidade": 1 }],
+  "pecas":    [{ "pecaId": "<id da peça>", "quantidade": 2 }]
 }
 ```
 

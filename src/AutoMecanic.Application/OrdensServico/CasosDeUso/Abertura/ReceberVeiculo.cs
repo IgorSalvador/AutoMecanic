@@ -12,12 +12,15 @@ namespace AutoMecanic.Application.OrdensServico.CasosDeUso;
 
 /// <summary>
 /// Recepção do veículo no balcão: identifica o cliente pelo CPF/CNPJ, localiza o veículo pela
-/// placa — cadastrando o que faltar — e abre a Ordem de Serviço, tudo em uma transação.
+/// placa — cadastrando o que faltar —, abre a Ordem de Serviço e já inclui os serviços e as
+/// peças combinados, reservando as peças no estoque. Tudo em uma transação: faltando saldo de
+/// uma única peça, nada é gravado, nem o número da OS.
 /// </summary>
 public sealed class ReceberVeiculo(
     IRepositorioDeClientes repositorioDeClientes,
     IRepositorioDeVeiculos repositorioDeVeiculos,
     AberturaDeOrdemServico abertura,
+    ComposicaoDaOrdemServico composicao,
     IUnitOfWork unitOfWork,
     ILogger<ReceberVeiculo> logger)
 {
@@ -37,6 +40,9 @@ public sealed class ReceberVeiculo(
             var veiculo = await ObterOuCadastrarVeiculoAsync(requisicao, placa, cliente, ct);
 
             var ordem = await abertura.AbrirAsync(cliente, veiculo, requisicao.DescricaoProblema, requisicao.QuilometragemEntrada, ct);
+
+            await composicao.IncluirServicosAsync(ordem, requisicao.Servicos ?? [], ct);
+            await composicao.IncluirPecasAsync(ordem, requisicao.Pecas ?? [], ct);
 
             await unitOfWork.SalvarAlteracoesAsync(ct);
 

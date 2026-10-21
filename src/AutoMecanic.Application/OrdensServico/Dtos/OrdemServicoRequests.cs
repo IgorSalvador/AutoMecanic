@@ -12,9 +12,10 @@ public sealed record AbrirOrdemServicoRequest(
     int? QuilometragemEntrada = null);
 
 /// <summary>
-/// Recepção do veículo em uma única chamada, refletindo o balcão da oficina: o atendente
-/// identifica o cliente pelo CPF/CNPJ, informa a placa e abre a OS. Cliente e veículo são
-/// cadastrados automaticamente quando ainda não existem.
+/// Abertura completa da Ordem de Serviço em uma única chamada, refletindo o balcão da oficina:
+/// o atendente identifica o cliente pelo CPF/CNPJ, informa a placa, os serviços e as peças
+/// combinados, e recebe a identificação da OS. Cliente e veículo são cadastrados
+/// automaticamente quando ainda não existem; as peças são reservadas no estoque.
 /// </summary>
 /// <param name="DocumentoCliente">CPF ou CNPJ do cliente, com ou sem máscara.</param>
 /// <param name="NomeCliente">Nome do cliente. Obrigatório apenas quando ele ainda não existe.</param>
@@ -28,6 +29,8 @@ public sealed record AbrirOrdemServicoRequest(
 /// <param name="Cor">Cor do veículo. Opcional.</param>
 /// <param name="DescricaoProblema">Relato do cliente sobre o problema.</param>
 /// <param name="QuilometragemEntrada">Leitura do odômetro na entrada. Opcional.</param>
+/// <param name="Servicos">Serviços do catálogo já combinados com o cliente. Opcional.</param>
+/// <param name="Pecas">Peças a reservar para a OS. Opcional; faltando saldo, nada é gravado.</param>
 public sealed record ReceberVeiculoRequest(
     string DocumentoCliente,
     string? NomeCliente,
@@ -40,7 +43,9 @@ public sealed record ReceberVeiculoRequest(
     int? AnoModelo,
     string? Cor,
     string DescricaoProblema,
-    int? QuilometragemEntrada = null);
+    int? QuilometragemEntrada = null,
+    IReadOnlyList<AdicionarServicoRequest>? Servicos = null,
+    IReadOnlyList<AdicionarPecaRequest>? Pecas = null);
 
 /// <summary>Laudo técnico do mecânico.</summary>
 /// <param name="Diagnostico">Texto do laudo.</param>

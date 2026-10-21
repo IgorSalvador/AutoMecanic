@@ -226,7 +226,7 @@ builder.Services.AddSwaggerGen(opcoes =>
 
             **Fluxo principal da Ordem de Serviço**
 
-            1. `POST /api/v1/ordens-servico/recepcao` — identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o veículo e abre a OS (status **Recebida**)
+            1. `POST /api/v1/ordens-servico/recepcao` — identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o veículo, abre a OS (status **Recebida**) e, opcionalmente, já inclui serviços e reserva peças
             2. `POST /api/v1/ordens-servico/{id}/diagnostico/iniciar` — status **Em diagnóstico**
             3. `POST /api/v1/ordens-servico/{id}/servicos` e `.../pecas` — compõem a OS; as peças são reservadas no estoque
             4. `POST /api/v1/ordens-servico/{id}/orcamento` — gera o orçamento automaticamente a partir dos itens
