@@ -430,6 +430,25 @@ public sealed class OrdensServicoController : ControllerBase
     // Consultas
     // -----------------------------------------------------------------
 
+    /// <summary>Informa a situação atual de uma OS, sem itens nem orçamento.</summary>
+    /// <param name="id">Identificador da OS.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
+    /// <param name="cancellationToken">Token de cancelamento.</param>
+    /// <response code="200">Situação atual e instante da última mudança.</response>
+    /// <response code="404">OS inexistente.</response>
+    /// <remarks>
+    /// Resposta enxuta para painéis e integrações que só precisam acompanhar a etapa da OS. O
+    /// cliente, sem autenticação, consulta a situação por <c>GET /api/v1/acompanhamento</c>.
+    /// </remarks>
+    [HttpGet("{id:guid}/status")]
+    [ProducesResponseType<StatusDaOrdemServicoResponse>(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<StatusDaOrdemServicoResponse>> ConsultarStatus(
+        [FromServices] ConsultarStatusDaOrdemServico casoDeUso,
+        Guid id,
+        CancellationToken cancellationToken) =>
+        Ok(await casoDeUso.ExecutarAsync(id, cancellationToken));
+
     /// <summary>Detalha uma OS, com itens, orçamento e linha do tempo.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="casoDeUso">Caso de uso executado pela ação.</param>

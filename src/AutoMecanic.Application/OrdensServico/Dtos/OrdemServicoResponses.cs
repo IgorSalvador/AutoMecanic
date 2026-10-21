@@ -228,6 +228,28 @@ public sealed record OrdemServicoResponse
     };
 }
 
+/// <summary>
+/// Situação atual de uma Ordem de Serviço, sem itens nem orçamento: a resposta para quem só
+/// precisa saber em que etapa a OS está — um painel, outro sistema, uma automação.
+/// </summary>
+/// <param name="Id">Identificador da OS.</param>
+/// <param name="Numero">Número legível (OS-AAAA-NNNNNN).</param>
+/// <param name="Status">Situação atual.</param>
+/// <param name="StatusDescricao">Situação atual em texto para exibição.</param>
+/// <param name="NoStatusDesde">Instante da última mudança de situação.</param>
+/// <param name="Encerrada">Verdadeiro quando a OS está entregue ou cancelada e não admite novas ações.</param>
+public sealed record StatusDaOrdemServicoResponse(
+    Guid Id,
+    string Numero,
+    StatusOrdemServico Status,
+    string StatusDescricao,
+    DateTimeOffset NoStatusDesde,
+    bool Encerrada)
+{
+    public static StatusDaOrdemServicoResponse De(Guid id, string numero, StatusOrdemServico status, DateTimeOffset noStatusDesde) =>
+        new(id, numero, status, status.Descricao(), noStatusDesde, status.EhTerminal());
+}
+
 /// <summary>Projeção enxuta para listagens administrativas.</summary>
 public sealed record OrdemServicoResumoResponse(
     Guid Id,

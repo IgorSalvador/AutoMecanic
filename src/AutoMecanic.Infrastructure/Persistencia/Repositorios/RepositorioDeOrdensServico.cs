@@ -1,5 +1,6 @@
 using AutoMecanic.Application.Abstractions;
 using AutoMecanic.Application.Common;
+using AutoMecanic.Application.OrdensServico.Dtos;
 using AutoMecanic.Domain.OrdensServico;
 using AutoMecanic.Domain.OrdensServico.ValueObjects;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,33 @@ public sealed class RepositorioDeOrdensServico(AutoMecanicDbContext contexto)
 {
     public async Task<OrdemServico?> ObterCompletaPorIdAsync(Guid id, CancellationToken cancellationToken = default) =>
         await Conjunto.FirstOrDefaultAsync(o => o.Id == id, cancellationToken);
+
+    public async Task<StatusDaOrdemServicoResponse?> ObterStatusAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        // Projeção direta: uma consulta com subconsulta ao histórico, sem materializar o
+        // agregado nem suas coleções.
+        var situacao = await Conjunto
+            .AsNoTracking()
+            .Where(o => o.Id == id)
+            .Select(o => new
+            {
+                o.Id,
+                o.Numero,
+                o.Status,
+                UltimaTransicao = EF.Property<IEnumerable<HistoricoStatus>>(o, "_historico")
+                    .Max(h => (DateTimeOffset?)h.OcorridoEm),
+                o.CriadaEm
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return situacao is null
+            ? null
+            : StatusDaOrdemServicoResponse.De(
+                situacao.Id,
+                situacao.Numero.Valor,
+                situacao.Status,
+                situacao.UltimaTransicao ?? situacao.CriadaEm);
+    }
 
     public async Task<OrdemServico?> ObterPorNumeroAsync(string numero, CancellationToken cancellationToken = default)
     {
