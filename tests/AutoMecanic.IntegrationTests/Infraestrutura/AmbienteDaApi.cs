@@ -4,6 +4,9 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 
 namespace AutoMecanic.IntegrationTests.Infraestrutura;
@@ -80,7 +83,20 @@ public sealed class AmbienteDaApi : WebApplicationFactory<Program>, IAsyncLifeti
         await _banco.DisposeAsync();
     }
 
-    protected override void ConfigureWebHost(IWebHostBuilder builder) => builder.UseEnvironment("Testing");
+    /// <summary>
+    /// Relógio da aplicação sob teste. Anda junto com o relógio real, mas pode ser adiantado
+    /// para exercitar regras de prazo (validade do orçamento) sem esperar dias.
+    /// </summary>
+    public RelogioDeTeste Relogio { get; } = new();
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.UseEnvironment("Testing");
+
+        // Substitui a fonte única de tempo: domínio e aplicação passam a ler este relógio.
+        builder.ConfigureTestServices(servicos =>
+            servicos.Replace(ServiceDescriptor.Singleton<TimeProvider>(Relogio)));
+    }
 
     private static void Definir(string chave, string valor) =>
         Environment.SetEnvironmentVariable(chave, valor);

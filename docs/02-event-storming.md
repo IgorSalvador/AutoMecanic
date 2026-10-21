@@ -256,8 +256,9 @@ flowchart TB
 
 > 🔴 **O cliente some e a peça fica presa indefinidamente.**
 > Decisão: o orçamento tem **validade** (padrão 7 dias). Uma rotina de manutenção expira os
-> vencidos e devolve as reservas. Exposta como
-> `POST /ordens-servico/manutencao/expirar-orcamentos` para o agendador chamar.
+> vencidos e devolve as reservas. Roda como CronJob do Kubernetes
+> (`--expirar-orcamentos`) e também pode ser acionada à mão por
+> `POST /ordens-servico/manutencao/expirar-orcamentos`.
 
 > 🔴 **A oficina quer dar desconto acima do permitido.**
 > Decisão em aberto para a Fase 2: hoje o desconto vai de 0 a 100% sem alçada. Uma regra de
