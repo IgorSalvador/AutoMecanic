@@ -59,5 +59,5 @@ public sealed class HistoricoStatus : Entity
             statusAtual,
             string.IsNullOrWhiteSpace(observacao) ? null : observacao.Trim(),
             usuarioId,
-            DateTimeOffset.UtcNow);
+            RelogioDoDominio.Agora);
 }

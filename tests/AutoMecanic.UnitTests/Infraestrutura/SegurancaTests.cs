@@ -100,7 +100,7 @@ public sealed class GeradorDeTokenJwtTests
         Audiencia = "AutoMecanic.Clientes",
         ChaveDeAssinatura = ChaveDeTeste,
         ValidadeEmMinutos = 60
-    }));
+    }), new Infrastructure.Servicos.ProvedorDeDataHora(TimeProvider.System));
 
     [Fact]
     public void Gerar_ProduzTokenComEmissorAudienciaEExpiracao()
@@ -182,9 +182,41 @@ public sealed class ConfiguracaoDeSegurancaTests
     [Fact]
     public void ProvedorDeDataHora_DevolveHorarioEmUtc()
     {
-        var agora = new Infrastructure.Servicos.ProvedorDeDataHora().Agora;
+        var agora = new Infrastructure.Servicos.ProvedorDeDataHora(TimeProvider.System).Agora;
 
         agora.Offset.ShouldBe(TimeSpan.Zero);
         agora.ShouldBeGreaterThan(DateTimeOffset.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public void ProvedorDeDataHora_UsaOProvedorDeTempoRecebido()
+    {
+        var instante = new DateTimeOffset(2026, 3, 10, 14, 0, 0, TimeSpan.Zero);
+
+        new Infrastructure.Servicos.ProvedorDeDataHora(new RelogioFixo(instante)).Agora.ShouldBe(instante);
+    }
+
+    [Fact]
+    public void GeradorDeToken_UsaORelogioDaAplicacaoParaAExpiracao()
+    {
+        var instante = new DateTimeOffset(2026, 3, 10, 14, 0, 0, TimeSpan.Zero);
+        var gerador = new GeradorDeTokenJwt(
+            Options.Create(new OpcoesDeJwt
+            {
+                Emissor = "AutoMecanic.Api",
+                Audiencia = "AutoMecanic.Clientes",
+                ChaveDeAssinatura = "chave-de-teste-com-mais-de-32-caracteres-para-hmac-sha256",
+                ValidadeEmMinutos = 60
+            }),
+            new Infrastructure.Servicos.ProvedorDeDataHora(new RelogioFixo(instante)));
+
+        var token = gerador.Gerar(Usuario.Criar("Ana Souza", "ana@automecanic.com.br", "Senha@Forte1", PerfilUsuario.Atendente, s => $"hash::{s}"));
+
+        token.ExpiraEm.ShouldBe(instante.AddMinutes(60));
+    }
+
+    private sealed class RelogioFixo(DateTimeOffset instante) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => instante;
     }
 }

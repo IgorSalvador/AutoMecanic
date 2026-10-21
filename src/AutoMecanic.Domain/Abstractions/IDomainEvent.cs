@@ -19,5 +19,5 @@ public abstract record DomainEvent : IDomainEvent
 {
     public Guid EventoId { get; init; } = Guid.CreateVersion7();
 
-    public DateTimeOffset OcorridoEm { get; init; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset OcorridoEm { get; init; } = RelogioDoDominio.Agora;
 }

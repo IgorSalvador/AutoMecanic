@@ -132,9 +132,7 @@ public sealed class ValidadorDeReceberVeiculo : AbstractValidator<ReceberVeiculo
 
         RuleFor(o => o.DescricaoProblema).NotEmpty().MaximumLength(2000);
 
-        RuleFor(o => o.AnoFabricacao)
-            .InclusiveBetween(1900, DateTimeOffset.UtcNow.Year + 1)
-            .When(o => o.AnoFabricacao is not null);
+        RuleFor(o => o.AnoFabricacao).AnoDeFabricacaoValido();
 
         RuleFor(o => o.QuilometragemEntrada)
             .InclusiveBetween(0, 3_000_000)

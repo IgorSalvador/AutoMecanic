@@ -66,7 +66,7 @@ public sealed class Servico : AggregateRoot
         Preco = preco;
         TempoEstimadoEmMinutos = tempoEstimadoEmMinutos;
         Ativo = true;
-        CadastradoEm = DateTimeOffset.UtcNow;
+        CadastradoEm = RelogioDoDominio.Agora;
     }
 
     public string Nome { get; private set; }
@@ -121,7 +121,7 @@ public sealed class Servico : AggregateRoot
         Descricao = NormalizarDescricao(descricao);
         Categoria = categoria;
         TempoEstimadoEmMinutos = ValidarTempoEstimado(tempoEstimadoEmMinutos);
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>
@@ -141,7 +141,7 @@ public sealed class Servico : AggregateRoot
 
         var anterior = Preco;
         Preco = precoValidado;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new PrecoDoServicoReajustado(Id, anterior.Valor, precoValidado.Valor));
     }
@@ -154,7 +154,7 @@ public sealed class Servico : AggregateRoot
         }
 
         Ativo = false;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new ServicoInativado(Id, Nome));
     }
@@ -167,7 +167,7 @@ public sealed class Servico : AggregateRoot
         }
 
         Ativo = true;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>Impede que um serviço fora de linha seja incluído em uma nova Ordem de Serviço.</summary>

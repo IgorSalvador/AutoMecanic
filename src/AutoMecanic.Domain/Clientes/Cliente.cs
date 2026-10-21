@@ -37,7 +37,7 @@ public sealed class Cliente : AggregateRoot
         Telefone = telefone;
         Endereco = endereco;
         Ativo = true;
-        CadastradoEm = DateTimeOffset.UtcNow;
+        CadastradoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>Nome civil da pessoa física ou razão social da pessoa jurídica.</summary>
@@ -95,7 +95,7 @@ public sealed class Cliente : AggregateRoot
         Email = ValueObjects.Email.Criar(email);
         Telefone = ValueObjects.Telefone.Criar(telefone);
         Endereco = endereco;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new DadosDeContatoDoClienteAtualizados(Id, Email.Endereco, Telefone.Numero));
     }
@@ -109,7 +109,7 @@ public sealed class Cliente : AggregateRoot
         }
 
         Ativo = false;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new ClienteInativado(Id, motivo ?? "Não informado"));
     }
@@ -123,7 +123,7 @@ public sealed class Cliente : AggregateRoot
         }
 
         Ativo = true;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new ClienteReativado(Id));
     }

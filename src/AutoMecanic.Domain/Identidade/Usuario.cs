@@ -59,7 +59,7 @@ public sealed class Usuario : AggregateRoot
         SenhaHash = senhaHash;
         Perfil = perfil;
         Ativo = true;
-        CadastradoEm = DateTimeOffset.UtcNow;
+        CadastradoEm = RelogioDoDominio.Agora;
     }
 
     public string Nome { get; private set; }
@@ -185,7 +185,7 @@ public sealed class Usuario : AggregateRoot
         }
 
         SenhaHash = gerarHash(validada);
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new SenhaAlterada(Id));
     }
@@ -198,7 +198,7 @@ public sealed class Usuario : AggregateRoot
         SenhaHash = gerarHash(ValidarPolitcaDeSenha(novaSenha));
         TentativasFalhas = 0;
         BloqueadoAte = null;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new SenhaAlterada(Id));
     }
@@ -211,13 +211,13 @@ public sealed class Usuario : AggregateRoot
         }
 
         Perfil = novoPerfil;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     public void AtualizarNome(string? nome)
     {
         Nome = ValidarNome(nome);
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     public void Inativar()
@@ -228,7 +228,7 @@ public sealed class Usuario : AggregateRoot
         }
 
         Ativo = false;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
 
         RegistrarEvento(new UsuarioInativado(Id, Email.Endereco));
     }
@@ -243,7 +243,7 @@ public sealed class Usuario : AggregateRoot
         Ativo = true;
         TentativasFalhas = 0;
         BloqueadoAte = null;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     /// <summary>Desbloqueio manual por um administrador.</summary>
@@ -251,7 +251,7 @@ public sealed class Usuario : AggregateRoot
     {
         TentativasFalhas = 0;
         BloqueadoAte = null;
-        AtualizadoEm = DateTimeOffset.UtcNow;
+        AtualizadoEm = RelogioDoDominio.Agora;
     }
 
     private void RegistrarTentativaFalha(DateTimeOffset agora)
