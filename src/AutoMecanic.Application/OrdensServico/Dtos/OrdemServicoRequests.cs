@@ -1,3 +1,5 @@
+using AutoMecanic.Domain.OrdensServico;
+
 namespace AutoMecanic.Application.OrdensServico.Dtos;
 
 /// <summary>Abertura de OS com cliente e veículo já cadastrados.</summary>
@@ -46,6 +48,23 @@ public sealed record ReceberVeiculoRequest(
     int? QuilometragemEntrada = null,
     IReadOnlyList<AdicionarServicoRequest>? Servicos = null,
     IReadOnlyList<AdicionarPecaRequest>? Pecas = null);
+
+/// <summary>Filtros da listagem de Ordens de Serviço.</summary>
+/// <param name="Status">Apenas uma situação. Quando informada, vale mesmo para as encerradas.</param>
+/// <param name="ClienteId">Apenas as OS de um cliente.</param>
+/// <param name="VeiculoId">Apenas as OS de um veículo.</param>
+/// <param name="De">Abertas a partir deste instante.</param>
+/// <param name="Ate">Abertas até este instante.</param>
+/// <param name="IncluirEncerradas">
+/// Inclui as finalizadas, entregues e canceladas, que por padrão saem da fila de trabalho.
+/// </param>
+public sealed record FiltroDeOrdensServico(
+    StatusOrdemServico? Status = null,
+    Guid? ClienteId = null,
+    Guid? VeiculoId = null,
+    DateTimeOffset? De = null,
+    DateTimeOffset? Ate = null,
+    bool IncluirEncerradas = false);
 
 /// <summary>Laudo técnico do mecânico.</summary>
 /// <param name="Diagnostico">Texto do laudo.</param>

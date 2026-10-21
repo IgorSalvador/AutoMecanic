@@ -77,7 +77,9 @@ internal sealed class OrdemServicoConfiguration : IEntityTypeConfiguration<Ordem
         ConfigurarHistorico(builder);
 
         // Índices que sustentam as listagens do painel e a consulta por período.
-        builder.HasIndex(o => o.Status).HasDatabaseName("ix_ordem_servico_status");
+        // Composto: atende a fila de trabalho (filtro por situação, ordem por abertura) e,
+        // pela coluna inicial, também as consultas só por situação.
+        builder.HasIndex(o => new { o.Status, o.CriadaEm }).HasDatabaseName("ix_ordem_servico_status_criada_em");
         builder.HasIndex(o => o.ClienteId).HasDatabaseName("ix_ordem_servico_cliente_id");
         builder.HasIndex(o => o.VeiculoId).HasDatabaseName("ix_ordem_servico_veiculo_id");
         builder.HasIndex(o => o.CriadaEm).HasDatabaseName("ix_ordem_servico_criada_em");

@@ -412,11 +412,11 @@ namespace AutoMecanic.Infrastructure.Persistencia.Migracoes
                         .IsUnique()
                         .HasDatabaseName("ux_ordem_servico_numero");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_ordem_servico_status");
-
                     b.HasIndex("VeiculoId")
                         .HasDatabaseName("ix_ordem_servico_veiculo_id");
+
+                    b.HasIndex("Status", "CriadaEm")
+                        .HasDatabaseName("ix_ordem_servico_status_criada_em");
 
                     b.ToTable("ordem_servico", "automecanic", t =>
                         {

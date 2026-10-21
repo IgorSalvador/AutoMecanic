@@ -133,12 +133,13 @@ public interface IRepositorioDeOrdensServico : IRepositorio<OrdemServico>
     /// <summary>Busca pelo número legível informado pelo cliente (OS-AAAA-NNNNNN).</summary>
     Task<OrdemServico?> ObterPorNumeroAsync(string numero, CancellationToken cancellationToken = default);
 
-    Task<ResultadoPaginado<OrdemServico>> ListarAsync(
-        StatusOrdemServico? status,
-        Guid? clienteId,
-        Guid? veiculoId,
-        DateTimeOffset? de,
-        DateTimeOffset? ate,
+    /// <summary>
+    /// Fila de trabalho da oficina, lida por projeção: ordenada pela prioridade de atendimento
+    /// da situação e, dentro de cada situação, da mais antiga para a mais nova. As encerradas
+    /// ficam de fora, salvo quando pedidas pelo filtro.
+    /// </summary>
+    Task<ResultadoPaginado<OrdemServicoResumoResponse>> ListarAsync(
+        FiltroDeOrdensServico filtro,
         ParametrosDePaginacao paginacao,
         CancellationToken cancellationToken = default);
 

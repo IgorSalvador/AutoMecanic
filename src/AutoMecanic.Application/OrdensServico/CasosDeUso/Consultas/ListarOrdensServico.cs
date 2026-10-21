@@ -1,27 +1,20 @@
 using AutoMecanic.Application.Abstractions;
 using AutoMecanic.Application.Common;
 using AutoMecanic.Application.OrdensServico.Dtos;
-using AutoMecanic.Domain.OrdensServico;
 
 namespace AutoMecanic.Application.OrdensServico.CasosDeUso;
 
-/// <summary>Listagem paginada de Ordens de Serviço, com filtros por situação, cliente, veículo e período.</summary>
+/// <summary>
+/// Fila de trabalho da oficina: Em execução, depois Aguardando aprovação, Em diagnóstico e
+/// Recebida; dentro de cada situação, das mais antigas para as mais novas. Finalizadas,
+/// entregues e canceladas saem da listagem — a exclusão é lógica, nada é apagado — e voltam
+/// quando o filtro pede as encerradas ou uma situação específica.
+/// </summary>
 public sealed class ListarOrdensServico(IRepositorioDeOrdensServico repositorio)
 {
     public async Task<ResultadoPaginado<OrdemServicoResumoResponse>> ExecutarAsync(
-        StatusOrdemServico? status,
-        Guid? clienteId,
-        Guid? veiculoId,
-        DateTimeOffset? de,
-        DateTimeOffset? ate,
+        FiltroDeOrdensServico filtro,
         ParametrosDePaginacao paginacao,
-        CancellationToken cancellationToken = default)
-    {
-        var pagina = await repositorio.ListarAsync(status, clienteId, veiculoId, de, ate, paginacao, cancellationToken);
-
-        return ResultadoPaginado<OrdemServicoResumoResponse>.Criar(
-            [.. pagina.Itens.Select(OrdemServicoResumoResponse.De)],
-            pagina.TotalDeItens,
-            paginacao);
-    }
+        CancellationToken cancellationToken = default) =>
+        await repositorio.ListarAsync(filtro, paginacao, cancellationToken);
 }
