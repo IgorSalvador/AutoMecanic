@@ -6,6 +6,7 @@
     <Project Path="src/AutoMecanic.Infrastructure/AutoMecanic.Infrastructure.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AutoMecanic.ArchitectureTests/AutoMecanic.ArchitectureTests.csproj" />
     <Project Path="tests/AutoMecanic.IntegrationTests/AutoMecanic.IntegrationTests.csproj" />
     <Project Path="tests/AutoMecanic.UnitTests/AutoMecanic.UnitTests.csproj" />
   </Folder>
