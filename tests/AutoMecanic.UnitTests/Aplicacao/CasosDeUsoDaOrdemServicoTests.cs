@@ -56,13 +56,14 @@ public sealed class CasosDeUsoDaOrdemServicoTests
 
         var operacao = new OperacaoSobreOrdemServico(_ordens, _clientes, _veiculos, _unitOfWork);
         var reservas = new ReservasDaOrdemServico(_pecas);
+        var composicao = new ComposicaoDaOrdemServico(_servicos, _pecas);
         var abertura = new AberturaDeOrdemServico(
             _ordens, _gerador, _usuarioAtual, _relogio, NullLogger<AberturaDeOrdemServico>.Instance);
 
         _abrir = new AbrirOrdemServico(_clientes, _veiculos, abertura, _unitOfWork);
-        _receberVeiculo = new ReceberVeiculo(_clientes, _veiculos, abertura, _unitOfWork, NullLogger<ReceberVeiculo>.Instance);
+        _receberVeiculo = new ReceberVeiculo(_clientes, _veiculos, abertura, composicao, _unitOfWork, NullLogger<ReceberVeiculo>.Instance);
         _adicionarServico = new AdicionarServicoNaOrdem(operacao, _servicos);
-        _adicionarPeca = new AdicionarPecaNaOrdem(operacao, _pecas, _unitOfWork, NullLogger<AdicionarPecaNaOrdem>.Instance);
+        _adicionarPeca = new AdicionarPecaNaOrdem(operacao, composicao, _pecas, _unitOfWork, NullLogger<AdicionarPecaNaOrdem>.Instance);
         _removerPeca = new RemoverPecaDaOrdem(operacao, _pecas, _unitOfWork);
         _aprovarOrcamento = new AprovarOrcamento(operacao, reservas, _unitOfWork, NullLogger<AprovarOrcamento>.Instance);
         _reprovarOrcamento = new ReprovarOrcamento(operacao, reservas, _unitOfWork, NullLogger<ReprovarOrcamento>.Instance);
@@ -144,6 +145,59 @@ public sealed class CasosDeUsoDaOrdemServicoTests
             _receberVeiculo.ExecutarAsync(new ReceberVeiculoRequest(
                 CpfValido, "Maria Souza", "maria@exemplo.com", "11987654321",
                 "ABC1D23", null, null, null, null, null, "Barulho", null)));
+    }
+
+    [Fact]
+    public async Task ReceberVeiculoAsync_ComServicosEPecas_AbreAOrdemComItensEReservaAsPecas()
+    {
+        ClienteComVeiculo();
+        var servico = Servico.Cadastrar("Troca de óleo", null, CategoriaServico.ManutencaoPreventiva, 120m, 45);
+        var peca = Peca.Cadastrar("OL-5W30", "Óleo 5W30", null, UnidadeMedida.Litro, 48.90m, 10, 2);
+
+        _servicos.ObterPorIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([servico]);
+        _pecas.ObterPorIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([peca]);
+
+        var resposta = await _receberVeiculo.ExecutarAsync(RecepcaoDoClienteCadastrado(
+            servicos: [new AdicionarServicoRequest(servico.Id, 1)],
+            pecas: [new AdicionarPecaRequest(peca.Id, 4)]));
+
+        resposta.Status.ShouldBe(StatusOrdemServico.Recebida);
+        resposta.Servicos.ShouldHaveSingleItem().PrecoUnitario.ShouldBe(120m);
+        resposta.Pecas.ShouldHaveSingleItem().Reservada.ShouldBeTrue();
+
+        // Reservada, mas ainda na prateleira: sai do disponível, não do saldo físico.
+        peca.QuantidadeReservada.ShouldBe(4);
+        peca.QuantidadeEmEstoque.ShouldBe(10);
+        _pecas.Received(1).Atualizar(peca);
+        await _unitOfWork.Received(1).SalvarAlteracoesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReceberVeiculoAsync_ComPecaSemSaldo_FalhaSemGravarNada()
+    {
+        ClienteComVeiculo();
+        var peca = Peca.Cadastrar("BAT-60AH", "Bateria 60Ah", null, UnidadeMedida.Unidade, 520m, 2, 1);
+
+        _pecas.ObterPorIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([peca]);
+
+        await Should.ThrowAsync<Domain.Abstractions.DomainException>(() =>
+            _receberVeiculo.ExecutarAsync(RecepcaoDoClienteCadastrado(pecas: [new AdicionarPecaRequest(peca.Id, 3)])));
+
+        peca.QuantidadeReservada.ShouldBe(0);
+        await _unitOfWork.DidNotReceive().SalvarAlteracoesAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ReceberVeiculoAsync_ComServicoInexistente_FalhaSemGravarNada()
+    {
+        ClienteComVeiculo();
+        _servicos.ObterPorIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([]);
+
+        await Should.ThrowAsync<RecursoNaoEncontradoException>(() =>
+            _receberVeiculo.ExecutarAsync(RecepcaoDoClienteCadastrado(
+                servicos: [new AdicionarServicoRequest(Guid.CreateVersion7(), 1)])));
+
+        await _unitOfWork.DidNotReceive().SalvarAlteracoesAsync(Arg.Any<CancellationToken>());
     }
 
     // -----------------------------------------------------------------
@@ -394,6 +448,12 @@ public sealed class CasosDeUsoDaOrdemServicoTests
 
         return (cliente, veiculo);
     }
+
+    /// <summary>Recepção do cliente e do veículo criados por <see cref="ClienteComVeiculo"/>.</summary>
+    private static ReceberVeiculoRequest RecepcaoDoClienteCadastrado(
+        IReadOnlyList<AdicionarServicoRequest>? servicos = null,
+        IReadOnlyList<AdicionarPecaRequest>? pecas = null) =>
+        new(CpfValido, null, null, null, "ABC1D23", null, null, null, null, null, "Barulho ao frear", 50_000, servicos, pecas);
 
     private OrdemServico AbrirOrdem(Cliente cliente, Veiculo veiculo)
     {

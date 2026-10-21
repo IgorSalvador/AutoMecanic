@@ -25,14 +25,7 @@ public sealed class AdicionarServicoNaOrdem(
         var servico = await repositorioDeServicos.ObterPorIdAsync(requisicao.ServicoId, cancellationToken)
             ?? throw new RecursoNaoEncontradoException("Serviço", requisicao.ServicoId);
 
-        servico.GarantirServicoAtivo();
-
-        ordem.AdicionarServico(
-            servico.Id,
-            servico.Nome,
-            servico.Preco.Valor,
-            requisicao.Quantidade,
-            servico.TempoEstimadoEmMinutos);
+        ComposicaoDaOrdemServico.IncluirServico(ordem, servico, requisicao.Quantidade);
 
         await operacao.PersistirAsync(ordem, cancellationToken);
 

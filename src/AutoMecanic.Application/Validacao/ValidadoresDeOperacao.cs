@@ -137,7 +137,31 @@ public sealed class ValidadorDeReceberVeiculo : AbstractValidator<ReceberVeiculo
         RuleFor(o => o.QuilometragemEntrada)
             .InclusiveBetween(0, 3_000_000)
             .When(o => o.QuilometragemEntrada is not null);
+
+        // Itens da abertura completa: as mesmas regras da inclusão avulsa, um limite que
+        // protege a transação de pedidos desproporcionais, e nenhum item repetido — a
+        // quantidade é que deve ser informada, não a mesma linha duas vezes.
+        RuleFor(o => o.Servicos)
+            .Must(itens => itens!.Count <= MaximoDeItensNaAbertura)
+            .WithMessage($"Informe no máximo {MaximoDeItensNaAbertura} serviços na abertura.")
+            .Must(itens => itens!.Select(i => i.ServicoId).Distinct().Count() == itens!.Count)
+            .WithMessage("O mesmo serviço foi informado mais de uma vez; ajuste a quantidade.")
+            .When(o => o.Servicos is not null);
+
+        RuleForEach(o => o.Servicos).SetValidator(new ValidadorDeAdicionarServico());
+
+        RuleFor(o => o.Pecas)
+            .Must(itens => itens!.Count <= MaximoDeItensNaAbertura)
+            .WithMessage($"Informe no máximo {MaximoDeItensNaAbertura} peças na abertura.")
+            .Must(itens => itens!.Select(i => i.PecaId).Distinct().Count() == itens!.Count)
+            .WithMessage("A mesma peça foi informada mais de uma vez; ajuste a quantidade.")
+            .When(o => o.Pecas is not null);
+
+        RuleForEach(o => o.Pecas).SetValidator(new ValidadorDeAdicionarPeca());
     }
+
+    /// <summary>Limite de itens de cada tipo informados na abertura da OS.</summary>
+    public const int MaximoDeItensNaAbertura = 50;
 }
 
 /// <summary>Validação do laudo técnico.</summary>

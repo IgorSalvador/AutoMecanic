@@ -53,15 +53,17 @@ public sealed class OrdensServicoController : ControllerBase
     }
 
     /// <summary>
-    /// Recepção do veículo no balcão: identifica o cliente pelo CPF/CNPJ, localiza ou cadastra
-    /// o veículo pela placa e abre a OS — tudo em uma única transação.
+    /// Abertura completa da OS: identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o
+    /// veículo pela placa, abre a OS e inclui os serviços e as peças informados — tudo em uma
+    /// única transação.
     /// </summary>
-    /// <param name="requisicao">Documento do cliente, placa e relato do problema.</param>
+    /// <param name="requisicao">Documento do cliente, placa, relato do problema e, opcionalmente, serviços e peças.</param>
     /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
-    /// <response code="201">OS aberta no status <c>Recebida</c>.</response>
-    /// <response code="400">Documento, placa ou dados obrigatórios inválidos.</response>
-    /// <response code="422">Cliente ou veículo inativo.</response>
+    /// <response code="201">OS aberta no status <c>Recebida</c>; a resposta traz o <c>id</c> e o <c>numero</c>.</response>
+    /// <response code="400">Documento, placa, dados obrigatórios ou itens inválidos (quantidade, item repetido).</response>
+    /// <response code="404">Serviço ou peça informados não existem.</response>
+    /// <response code="422">Cliente, veículo, serviço ou peça inativos, ou peça sem saldo disponível. Nada é gravado.</response>
     /// <remarks>
     /// Cliente e veículo são cadastrados automaticamente quando ainda não existem — nesse caso,
     /// os dados de contato e as informações do veículo passam a ser obrigatórios.
@@ -70,6 +72,7 @@ public sealed class OrdensServicoController : ControllerBase
     [Authorize(Policy = PoliticasDeAutorizacao.Atender)]
     [ProducesResponseType<OrdemServicoResponse>(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> ReceberVeiculo(
         [FromServices] ReceberVeiculo casoDeUso,
