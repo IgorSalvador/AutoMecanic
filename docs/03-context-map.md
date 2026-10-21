@@ -113,7 +113,7 @@ A validação que cruza a fronteira ("o cliente está ativo?", "o veículo é de
 **camada de aplicação**, que é o único lugar autorizado a enxergar os dois contextos:
 
 ```csharp
-// Application/OrdensServico/ServicoDeOrdensServico.cs
+// Application/OrdensServico/CasosDeUso/Apoio/AberturaDeOrdemServico.cs
 cliente.GarantirClienteAtivo();
 veiculo.GarantirVeiculoAtivo();
 

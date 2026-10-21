@@ -1,6 +1,7 @@
 using AutoMecanic.Application.Abstractions;
 using AutoMecanic.Application.Common;
-using AutoMecanic.Application.OrdensServico;
+using AutoMecanic.Application.OrdensServico.CasosDeUso;
+using AutoMecanic.Application.OrdensServico.CasosDeUso.Apoio;
 using AutoMecanic.Application.OrdensServico.Dtos;
 using AutoMecanic.Domain.Clientes;
 using AutoMecanic.Domain.Estoque;
@@ -13,11 +14,11 @@ using NSubstitute;
 namespace AutoMecanic.UnitTests.Aplicacao;
 
 /// <summary>
-/// A camada de aplicação não contém regra de negócio, mas é ela que coordena Ordem de
+/// Os casos de uso não contêm regra de negócio, mas são eles que coordenam Ordem de
 /// Serviço e Estoque. Estes testes verificam justamente essa costura: reservar ao incluir a
 /// peça, consumir ao aprovar, devolver ao reprovar ou cancelar.
 /// </summary>
-public sealed class ServicoDeOrdensServicoTests
+public sealed class CasosDeUsoDaOrdemServicoTests
 {
     private const string CpfValido = "52998224725";
 
@@ -31,9 +32,18 @@ public sealed class ServicoDeOrdensServicoTests
     private readonly IProvedorDeDataHora _relogio = Substitute.For<IProvedorDeDataHora>();
     private readonly IUnitOfWork _unitOfWork = Substitute.For<IUnitOfWork>();
 
-    private readonly ServicoDeOrdensServico _servico;
+    private readonly AbrirOrdemServico _abrir;
+    private readonly ReceberVeiculo _receberVeiculo;
+    private readonly AdicionarServicoNaOrdem _adicionarServico;
+    private readonly AdicionarPecaNaOrdem _adicionarPeca;
+    private readonly RemoverPecaDaOrdem _removerPeca;
+    private readonly AprovarOrcamento _aprovarOrcamento;
+    private readonly ReprovarOrcamento _reprovarOrcamento;
+    private readonly CancelarOrdemServico _cancelar;
+    private readonly AcompanharOrdemServico _acompanhar;
+    private readonly ExpirarOrcamentosVencidos _expirar;
 
-    public ServicoDeOrdensServicoTests()
+    public CasosDeUsoDaOrdemServicoTests()
     {
         _relogio.Agora.Returns(new DateTimeOffset(2026, 3, 15, 10, 0, 0, TimeSpan.Zero));
         _gerador.ProximoSequencialAsync(Arg.Any<int>(), Arg.Any<CancellationToken>()).Returns(1);
@@ -44,10 +54,21 @@ public sealed class ServicoDeOrdensServicoTests
             .ExecutarEmTransacaoAsync(Arg.Any<Func<CancellationToken, Task<OrdemServicoResponse>>>(), Arg.Any<CancellationToken>())
             .Returns(chamada => chamada.Arg<Func<CancellationToken, Task<OrdemServicoResponse>>>()(CancellationToken.None));
 
-        _servico = new ServicoDeOrdensServico(
-            _ordens, _clientes, _veiculos, _servicos, _pecas,
-            _gerador, _usuarioAtual, _relogio, _unitOfWork,
-            NullLogger<ServicoDeOrdensServico>.Instance);
+        var operacao = new OperacaoSobreOrdemServico(_ordens, _clientes, _veiculos, _unitOfWork);
+        var reservas = new ReservasDaOrdemServico(_pecas);
+        var abertura = new AberturaDeOrdemServico(
+            _ordens, _gerador, _usuarioAtual, _relogio, NullLogger<AberturaDeOrdemServico>.Instance);
+
+        _abrir = new AbrirOrdemServico(_clientes, _veiculos, abertura, _unitOfWork);
+        _receberVeiculo = new ReceberVeiculo(_clientes, _veiculos, abertura, _unitOfWork, NullLogger<ReceberVeiculo>.Instance);
+        _adicionarServico = new AdicionarServicoNaOrdem(operacao, _servicos);
+        _adicionarPeca = new AdicionarPecaNaOrdem(operacao, _pecas, _unitOfWork, NullLogger<AdicionarPecaNaOrdem>.Instance);
+        _removerPeca = new RemoverPecaDaOrdem(operacao, _pecas, _unitOfWork);
+        _aprovarOrcamento = new AprovarOrcamento(operacao, reservas, _unitOfWork, NullLogger<AprovarOrcamento>.Instance);
+        _reprovarOrcamento = new ReprovarOrcamento(operacao, reservas, _unitOfWork, NullLogger<ReprovarOrcamento>.Instance);
+        _cancelar = new CancelarOrdemServico(operacao, reservas, _usuarioAtual, _unitOfWork);
+        _acompanhar = new AcompanharOrdemServico(_ordens, _clientes, _veiculos);
+        _expirar = new ExpirarOrcamentosVencidos(_ordens, reservas, _relogio, _unitOfWork, NullLogger<ExpirarOrcamentosVencidos>.Instance);
     }
 
     // -----------------------------------------------------------------
@@ -59,7 +80,7 @@ public sealed class ServicoDeOrdensServicoTests
     {
         var (cliente, veiculo) = ClienteComVeiculo();
 
-        var resposta = await _servico.AbrirAsync(
+        var resposta = await _abrir.ExecutarAsync(
             new AbrirOrdemServicoRequest(cliente.Id, veiculo.Id, "Barulho ao frear", 50_000));
 
         resposta.Numero.ShouldBe("OS-2026-000001");
@@ -75,7 +96,7 @@ public sealed class ServicoDeOrdensServicoTests
         _clientes.ObterPorIdAsync(Arg.Any<Guid>(), Arg.Any<CancellationToken>()).Returns((Cliente?)null);
 
         await Should.ThrowAsync<RecursoNaoEncontradoException>(() =>
-            _servico.AbrirAsync(new AbrirOrdemServicoRequest(Guid.CreateVersion7(), Guid.CreateVersion7(), "Problema")));
+            _abrir.ExecutarAsync(new AbrirOrdemServicoRequest(Guid.CreateVersion7(), Guid.CreateVersion7(), "Problema")));
     }
 
     [Fact]
@@ -89,7 +110,7 @@ public sealed class ServicoDeOrdensServicoTests
         // Abrir uma OS para o carro de outra pessoa é o tipo de erro que só o
         // cruzamento entre agregados detecta.
         await Should.ThrowAsync<ConflitoException>(() =>
-            _servico.AbrirAsync(new AbrirOrdemServicoRequest(cliente.Id, veiculoDeTerceiro.Id, "Problema")));
+            _abrir.ExecutarAsync(new AbrirOrdemServicoRequest(cliente.Id, veiculoDeTerceiro.Id, "Problema")));
     }
 
     [Fact]
@@ -100,7 +121,7 @@ public sealed class ServicoDeOrdensServicoTests
         _veiculos.ObterPorPlacaAsync(Arg.Any<Domain.Veiculos.ValueObjects.Placa>(), Arg.Any<CancellationToken>())
             .Returns((Veiculo?)null);
 
-        var resposta = await _servico.ReceberVeiculoAsync(new ReceberVeiculoRequest(
+        var resposta = await _receberVeiculo.ExecutarAsync(new ReceberVeiculoRequest(
             CpfValido, "Maria Souza", "maria@exemplo.com", "11987654321",
             "ABC1D23", "Volkswagen", "Gol", 2020, 2021, "Branco",
             "Barulho ao frear", 50_000));
@@ -120,7 +141,7 @@ public sealed class ServicoDeOrdensServicoTests
             .Returns((Veiculo?)null);
 
         await Should.ThrowAsync<ValidacaoException>(() =>
-            _servico.ReceberVeiculoAsync(new ReceberVeiculoRequest(
+            _receberVeiculo.ExecutarAsync(new ReceberVeiculoRequest(
                 CpfValido, "Maria Souza", "maria@exemplo.com", "11987654321",
                 "ABC1D23", null, null, null, null, null, "Barulho", null)));
     }
@@ -138,7 +159,7 @@ public sealed class ServicoDeOrdensServicoTests
         _ordens.ObterCompletaPorIdAsync(ordem.Id, Arg.Any<CancellationToken>()).Returns(ordem);
         _pecas.ObterPorIdAsync(peca.Id, Arg.Any<CancellationToken>()).Returns(peca);
 
-        var resposta = await _servico.AdicionarPecaAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 4));
+        var resposta = await _adicionarPeca.ExecutarAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 4));
 
         peca.QuantidadeReservada.ShouldBe(4);
         peca.QuantidadeDisponivel.ShouldBe(6);
@@ -157,7 +178,7 @@ public sealed class ServicoDeOrdensServicoTests
         _pecas.ObterPorIdAsync(peca.Id, Arg.Any<CancellationToken>()).Returns(peca);
 
         await Should.ThrowAsync<Domain.Abstractions.DomainException>(() =>
-            _servico.AdicionarPecaAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 5)));
+            _adicionarPeca.ExecutarAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 5)));
 
         // A reserva acontece antes de tocar na OS: a falha deixa os dois agregados intactos.
         ordem.ItensPeca.ShouldBeEmpty();
@@ -173,10 +194,10 @@ public sealed class ServicoDeOrdensServicoTests
         _ordens.ObterCompletaPorIdAsync(ordem.Id, Arg.Any<CancellationToken>()).Returns(ordem);
         _pecas.ObterPorIdAsync(peca.Id, Arg.Any<CancellationToken>()).Returns(peca);
 
-        await _servico.AdicionarPecaAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 3));
+        await _adicionarPeca.ExecutarAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 3));
         var itemId = ordem.ItensPeca.First().Id;
 
-        await _servico.RemoverPecaAsync(ordem.Id, itemId);
+        await _removerPeca.ExecutarAsync(ordem.Id, itemId);
 
         peca.QuantidadeReservada.ShouldBe(0);
         peca.QuantidadeDisponivel.ShouldBe(10);
@@ -188,7 +209,7 @@ public sealed class ServicoDeOrdensServicoTests
     {
         var (ordem, peca) = OrdemComOrcamentoEnviado();
 
-        await _servico.AprovarOrcamentoAsync(ordem.Id);
+        await _aprovarOrcamento.ExecutarAsync(ordem.Id);
 
         ordem.Status.ShouldBe(StatusOrdemServico.EmExecucao);
 
@@ -203,7 +224,7 @@ public sealed class ServicoDeOrdensServicoTests
     {
         var (ordem, peca) = OrdemComOrcamentoEnviado();
 
-        await _servico.ReprovarOrcamentoAsync(ordem.Id, new ReprovarOrcamentoRequest("Valor alto"));
+        await _reprovarOrcamento.ExecutarAsync(ordem.Id, new ReprovarOrcamentoRequest("Valor alto"));
 
         ordem.Status.ShouldBe(StatusOrdemServico.Cancelada);
 
@@ -223,9 +244,9 @@ public sealed class ServicoDeOrdensServicoTests
         _pecas.ObterPorIdAsync(peca.Id, Arg.Any<CancellationToken>()).Returns(peca);
         _pecas.ObterPorIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>(), Arg.Any<CancellationToken>()).Returns([peca]);
 
-        await _servico.AdicionarPecaAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 3));
+        await _adicionarPeca.ExecutarAsync(ordem.Id, new AdicionarPecaRequest(peca.Id, 3));
 
-        await _servico.CancelarAsync(ordem.Id, new CancelarOrdemServicoRequest("Cliente desistiu"));
+        await _cancelar.ExecutarAsync(ordem.Id, new CancelarOrdemServicoRequest("Cliente desistiu"));
 
         ordem.Status.ShouldBe(StatusOrdemServico.Cancelada);
         peca.QuantidadeReservada.ShouldBe(0);
@@ -244,7 +265,7 @@ public sealed class ServicoDeOrdensServicoTests
         _ordens.ObterCompletaPorIdAsync(ordem.Id, Arg.Any<CancellationToken>()).Returns(ordem);
         _servicos.ObterPorIdAsync(servicoCatalogo.Id, Arg.Any<CancellationToken>()).Returns(servicoCatalogo);
 
-        var resposta = await _servico.AdicionarServicoAsync(ordem.Id, new AdicionarServicoRequest(servicoCatalogo.Id, 2));
+        var resposta = await _adicionarServico.ExecutarAsync(ordem.Id, new AdicionarServicoRequest(servicoCatalogo.Id, 2));
 
         var item = resposta.Servicos.ShouldHaveSingleItem();
         item.PrecoUnitario.ShouldBe(120m);
@@ -263,7 +284,7 @@ public sealed class ServicoDeOrdensServicoTests
         _servicos.ObterPorIdAsync(servicoCatalogo.Id, Arg.Any<CancellationToken>()).Returns(servicoCatalogo);
 
         await Should.ThrowAsync<Domain.Abstractions.DomainException>(() =>
-            _servico.AdicionarServicoAsync(ordem.Id, new AdicionarServicoRequest(servicoCatalogo.Id, 1)));
+            _adicionarServico.ExecutarAsync(ordem.Id, new AdicionarServicoRequest(servicoCatalogo.Id, 1)));
     }
 
     // -----------------------------------------------------------------
@@ -278,7 +299,7 @@ public sealed class ServicoDeOrdensServicoTests
 
         _ordens.ObterPorNumeroAsync("OS-2026-000001", Arg.Any<CancellationToken>()).Returns(ordem);
 
-        var resposta = await _servico.AcompanharAsync("OS-2026-000001", CpfValido);
+        var resposta = await _acompanhar.ExecutarAsync("OS-2026-000001", CpfValido);
 
         resposta.Numero.ShouldBe("OS-2026-000001");
         resposta.Status.ShouldBe(StatusOrdemServico.Recebida);
@@ -296,7 +317,7 @@ public sealed class ServicoDeOrdensServicoTests
         // A resposta é a mesma de "OS inexistente": diferenciá-las permitiria
         // enumerar números de OS válidos.
         await Should.ThrowAsync<RecursoNaoEncontradoException>(() =>
-            _servico.AcompanharAsync("OS-2026-000001", "16899535009"));
+            _acompanhar.ExecutarAsync("OS-2026-000001", "16899535009"));
     }
 
     [Fact]
@@ -305,7 +326,7 @@ public sealed class ServicoDeOrdensServicoTests
         _ordens.ObterPorNumeroAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns((OrdemServico?)null);
 
         await Should.ThrowAsync<RecursoNaoEncontradoException>(() =>
-            _servico.AcompanharAsync("OS-2026-999999", CpfValido));
+            _acompanhar.ExecutarAsync("OS-2026-999999", CpfValido));
     }
 
     [Fact]
@@ -315,7 +336,7 @@ public sealed class ServicoDeOrdensServicoTests
 
         _ordens.ObterPorNumeroAsync(ordem.Numero.Valor, Arg.Any<CancellationToken>()).Returns(ordem);
 
-        var resposta = await _servico.AcompanharAsync(ordem.Numero.Valor, CpfValido);
+        var resposta = await _acompanhar.ExecutarAsync(ordem.Numero.Valor, CpfValido);
 
         // Rascunho interno da oficina: o cliente só vê o orçamento depois de enviado.
         resposta.ValorOrcamento.ShouldBeNull();
@@ -330,7 +351,7 @@ public sealed class ServicoDeOrdensServicoTests
 
         _ordens.ObterPorNumeroAsync(ordem.Numero.Valor, Arg.Any<CancellationToken>()).Returns(ordem);
 
-        var resposta = await _servico.AcompanharAsync(ordem.Numero.Valor, CpfValido);
+        var resposta = await _acompanhar.ExecutarAsync(ordem.Numero.Valor, CpfValido);
 
         // Cancelado antes do envio, o orçamento nunca deixou de ser rascunho interno.
         resposta.ValorOrcamento.ShouldBeNull();
@@ -340,7 +361,7 @@ public sealed class ServicoDeOrdensServicoTests
     [Fact]
     public async Task AcompanharAsync_ComDocumentoInvalido_LancaValidacao() =>
         await Should.ThrowAsync<ValidacaoException>(() =>
-            _servico.AcompanharAsync("OS-2026-000001", "00000000000"));
+            _acompanhar.ExecutarAsync("OS-2026-000001", "00000000000"));
 
     // -----------------------------------------------------------------
     // Expiração
@@ -351,7 +372,7 @@ public sealed class ServicoDeOrdensServicoTests
     {
         _ordens.ListarComOrcamentoVencidoAsync(Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>()).Returns([]);
 
-        (await _servico.ExpirarOrcamentosVencidosAsync()).ShouldBe(0);
+        (await _expirar.ExecutarAsync()).ShouldBe(0);
 
         await _unitOfWork.DidNotReceive().ExecutarEmTransacaoAsync(
             Arg.Any<Func<CancellationToken, Task<int>>>(), Arg.Any<CancellationToken>());

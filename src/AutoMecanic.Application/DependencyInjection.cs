@@ -3,7 +3,6 @@ using AutoMecanic.Application.Clientes;
 using AutoMecanic.Application.Estoque;
 using AutoMecanic.Application.Identidade;
 using AutoMecanic.Application.Indicadores;
-using AutoMecanic.Application.OrdensServico;
 using AutoMecanic.Application.Servicos;
 using AutoMecanic.Application.Veiculos;
 using FluentValidation;
@@ -28,10 +27,14 @@ public static class DependencyInjection
         services.AddScoped<IServicoDeVeiculos, ServicoDeVeiculos>();
         services.AddScoped<IServicoDeCatalogo, ServicoDeCatalogo>();
         services.AddScoped<IServicoDeEstoque, ServicoDeEstoque>();
-        services.AddScoped<IServicoDeOrdensServico, ServicoDeOrdensServico>();
         services.AddScoped<IServicoDeAutenticacao, ServicoDeAutenticacao>();
         services.AddScoped<IServicoDeUsuarios, ServicoDeUsuarios>();
         services.AddScoped<IServicoDeIndicadores, ServicoDeIndicadores>();
+
+        // Casos de uso da Ordem de Serviço: uma classe por operação, mais os colaboradores
+        // que elas compartilham (namespace Apoio). Descobertos por convenção, para que um caso
+        // de uso novo não dependa de alguém lembrar de registrá-lo.
+        services.AdicionarCasosDeUso(assembly);
 
         // Validadores de requisição (FluentValidation), descobertos por convenção.
         services.AddValidatorsFromAssembly(assembly, ServiceLifetime.Singleton, includeInternalTypes: false);
@@ -41,6 +44,22 @@ public static class DependencyInjection
         services.AdicionarManipuladoresDeEventos(assembly);
 
         return services;
+    }
+
+    /// <summary>Namespace que reúne os casos de uso e seus colaboradores.</summary>
+    public const string NamespaceDosCasosDeUso = "AutoMecanic.Application.OrdensServico.CasosDeUso";
+
+    private static void AdicionarCasosDeUso(this IServiceCollection services, Assembly assembly)
+    {
+        var casosDeUso = assembly
+            .GetTypes()
+            .Where(tipo => tipo is { IsClass: true, IsAbstract: false, IsPublic: true }
+                           && tipo.Namespace?.StartsWith(NamespaceDosCasosDeUso, StringComparison.Ordinal) == true);
+
+        foreach (var tipo in casosDeUso)
+        {
+            services.AddScoped(tipo);
+        }
     }
 
     private static void AdicionarManipuladoresDeEventos(this IServiceCollection services, Assembly assembly)

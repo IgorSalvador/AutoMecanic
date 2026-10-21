@@ -1,6 +1,6 @@
 using AutoMecanic.Api.Configuracao;
 using AutoMecanic.Application.Common;
-using AutoMecanic.Application.OrdensServico;
+using AutoMecanic.Application.OrdensServico.CasosDeUso;
 using AutoMecanic.Application.OrdensServico.Dtos;
 using AutoMecanic.Domain.OrdensServico;
 using Microsoft.AspNetCore.Authorization;
@@ -22,7 +22,7 @@ namespace AutoMecanic.Api.Controllers;
 [Authorize(Policy = PoliticasDeAutorizacao.Consultar)]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
 [ProducesResponseType(StatusCodes.Status403Forbidden)]
-public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : ControllerBase
+public sealed class OrdensServicoController : ControllerBase
 {
     // -----------------------------------------------------------------
     // Abertura
@@ -30,6 +30,7 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
 
     /// <summary>Abre uma OS para cliente e veículo já cadastrados.</summary>
     /// <param name="requisicao">Cliente, veículo e relato do problema.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="201">OS aberta no status <c>Recebida</c>.</response>
     /// <response code="404">Cliente ou veículo inexistente.</response>
@@ -42,10 +43,11 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> Abrir(
+        [FromServices] AbrirOrdemServico casoDeUso,
         [FromBody] AbrirOrdemServicoRequest requisicao,
         CancellationToken cancellationToken)
     {
-        var ordem = await servico.AbrirAsync(requisicao, cancellationToken);
+        var ordem = await casoDeUso.ExecutarAsync(requisicao, cancellationToken);
 
         return CreatedAtAction(nameof(ObterPorId), new { id = ordem.Id }, ordem);
     }
@@ -55,6 +57,7 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     /// o veículo pela placa e abre a OS — tudo em uma única transação.
     /// </summary>
     /// <param name="requisicao">Documento do cliente, placa e relato do problema.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="201">OS aberta no status <c>Recebida</c>.</response>
     /// <response code="400">Documento, placa ou dados obrigatórios inválidos.</response>
@@ -69,10 +72,11 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> ReceberVeiculo(
+        [FromServices] ReceberVeiculo casoDeUso,
         [FromBody] ReceberVeiculoRequest requisicao,
         CancellationToken cancellationToken)
     {
-        var ordem = await servico.ReceberVeiculoAsync(requisicao, cancellationToken);
+        var ordem = await casoDeUso.ExecutarAsync(requisicao, cancellationToken);
 
         return CreatedAtAction(nameof(ObterPorId), new { id = ordem.Id }, ordem);
     }
@@ -83,6 +87,7 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
 
     /// <summary>Inicia o diagnóstico. Move a OS de <c>Recebida</c> para <c>Em diagnóstico</c>.</summary>
     /// <param name="id">Identificador da OS.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Diagnóstico iniciado.</response>
     /// <response code="404">OS inexistente.</response>
@@ -93,13 +98,15 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> IniciarDiagnostico(
+        [FromServices] IniciarDiagnostico casoDeUso,
         Guid id,
         CancellationToken cancellationToken) =>
-        Ok(await servico.IniciarDiagnosticoAsync(id, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, cancellationToken));
 
     /// <summary>Registra o laudo técnico do mecânico.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Texto do laudo.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Laudo registrado.</response>
     /// <response code="404">OS inexistente.</response>
@@ -110,10 +117,11 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> RegistrarDiagnostico(
+        [FromServices] RegistrarDiagnostico casoDeUso,
         Guid id,
         [FromBody] RegistrarDiagnosticoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.RegistrarDiagnosticoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     // -----------------------------------------------------------------
     // Composição de itens
@@ -122,6 +130,7 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     /// <summary>Inclui um serviço do catálogo na OS.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Serviço e quantidade.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Serviço incluído; o orçamento em elaboração é recalculado.</response>
     /// <response code="404">OS ou serviço inexistente.</response>
@@ -133,15 +142,17 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> AdicionarServico(
+        [FromServices] AdicionarServicoNaOrdem casoDeUso,
         Guid id,
         [FromBody] AdicionarServicoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.AdicionarServicoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Altera a quantidade de um item de serviço.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="itemId">Identificador do item.</param>
     /// <param name="requisicao">Nova quantidade.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Quantidade alterada.</response>
     /// <response code="404">OS ou item inexistente.</response>
@@ -152,15 +163,17 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> AlterarQuantidadeDeServico(
+        [FromServices] AlterarQuantidadeDeServico casoDeUso,
         Guid id,
         Guid itemId,
         [FromBody] AlterarQuantidadeRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.AlterarQuantidadeDeServicoAsync(id, itemId, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, itemId, requisicao, cancellationToken));
 
     /// <summary>Remove um item de serviço da OS.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="itemId">Identificador do item.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Item removido.</response>
     /// <response code="404">OS ou item inexistente.</response>
@@ -171,14 +184,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> RemoverServico(
+        [FromServices] RemoverServicoDaOrdem casoDeUso,
         Guid id,
         Guid itemId,
         CancellationToken cancellationToken) =>
-        Ok(await servico.RemoverServicoAsync(id, itemId, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, itemId, cancellationToken));
 
     /// <summary>Inclui uma peça na OS e reserva a quantidade no estoque.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Peça e quantidade.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Peça incluída e quantidade reservada.</response>
     /// <response code="404">OS ou peça inexistente.</response>
@@ -193,14 +208,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> AdicionarPeca(
+        [FromServices] AdicionarPecaNaOrdem casoDeUso,
         Guid id,
         [FromBody] AdicionarPecaRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.AdicionarPecaAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Remove uma peça da OS e devolve a quantidade reservada ao estoque.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="itemId">Identificador do item de peça.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Peça removida e reserva liberada.</response>
     /// <response code="404">OS ou item inexistente.</response>
@@ -211,10 +228,11 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> RemoverPeca(
+        [FromServices] RemoverPecaDaOrdem casoDeUso,
         Guid id,
         Guid itemId,
         CancellationToken cancellationToken) =>
-        Ok(await servico.RemoverPecaAsync(id, itemId, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, itemId, cancellationToken));
 
     // -----------------------------------------------------------------
     // Orçamento
@@ -223,6 +241,7 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     /// <summary>Gera o orçamento automaticamente a partir dos itens da OS.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Percentual de desconto comercial, de 0 a 100.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Orçamento gerado.</response>
     /// <response code="404">OS inexistente.</response>
@@ -234,14 +253,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> GerarOrcamento(
+        [FromServices] GerarOrcamento casoDeUso,
         Guid id,
         [FromBody] GerarOrcamentoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.GerarOrcamentoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Envia o orçamento ao cliente. Move a OS para <c>Aguardando aprovação</c>.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Prazo de validade em dias.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Orçamento enviado; os itens ficam congelados.</response>
     /// <response code="404">OS inexistente.</response>
@@ -252,13 +273,15 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> EnviarOrcamento(
+        [FromServices] EnviarOrcamento casoDeUso,
         Guid id,
         [FromBody] EnviarOrcamentoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.EnviarOrcamentoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Registra a aprovação do orçamento pelo cliente.</summary>
     /// <param name="id">Identificador da OS.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Orçamento aprovado; a OS passa a <c>Em execução</c> e as peças são baixadas.</response>
     /// <response code="404">OS inexistente.</response>
@@ -269,13 +292,15 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> AprovarOrcamento(
+        [FromServices] AprovarOrcamento casoDeUso,
         Guid id,
         CancellationToken cancellationToken) =>
-        Ok(await servico.AprovarOrcamentoAsync(id, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, cancellationToken));
 
     /// <summary>Registra a reprovação do orçamento pelo cliente.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Motivo informado pelo cliente.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Orçamento reprovado; a OS é cancelada e as reservas são devolvidas.</response>
     /// <response code="404">OS inexistente.</response>
@@ -286,14 +311,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> ReprovarOrcamento(
+        [FromServices] ReprovarOrcamento casoDeUso,
         Guid id,
         [FromBody] ReprovarOrcamentoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.ReprovarOrcamentoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Devolve a OS ao diagnóstico para revisão do escopo.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="motivo">Justificativa da revisão.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">OS devolvida ao diagnóstico; os itens voltam a ser editáveis.</response>
     /// <response code="404">OS inexistente.</response>
@@ -304,10 +331,11 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> RetornarParaDiagnostico(
+        [FromServices] RetornarParaDiagnostico casoDeUso,
         Guid id,
         [FromQuery] string? motivo,
         CancellationToken cancellationToken) =>
-        Ok(await servico.RetornarParaDiagnosticoAsync(id, motivo, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, motivo, cancellationToken));
 
     // -----------------------------------------------------------------
     // Execução e entrega
@@ -316,6 +344,7 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     /// <summary>Conclui os serviços. Move a OS para <c>Finalizada</c>.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Observação do mecânico.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Serviços finalizados; a duração real passa a alimentar o indicador de tempo médio.</response>
     /// <response code="404">OS inexistente.</response>
@@ -326,14 +355,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> Finalizar(
+        [FromServices] FinalizarServico casoDeUso,
         Guid id,
         [FromBody] FinalizarServicoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.FinalizarServicoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Registra a entrega do veículo ao cliente.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Observação da entrega.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Veículo entregue; a OS chega ao estado terminal <c>Entregue</c>.</response>
     /// <response code="404">OS inexistente.</response>
@@ -344,14 +375,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> Entregar(
+        [FromServices] EntregarVeiculo casoDeUso,
         Guid id,
         [FromBody] EntregarVeiculoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.EntregarVeiculoAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Cancela a OS antes da execução.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Motivo obrigatório do cancelamento.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">OS cancelada e reservas de peça devolvidas.</response>
     /// <response code="404">OS inexistente.</response>
@@ -366,14 +399,16 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status422UnprocessableEntity)]
     public async Task<ActionResult<OrdemServicoResponse>> Cancelar(
+        [FromServices] CancelarOrdemServico casoDeUso,
         Guid id,
         [FromBody] CancelarOrdemServicoRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.CancelarAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     /// <summary>Atribui o responsável técnico pela OS.</summary>
     /// <param name="id">Identificador da OS.</param>
     /// <param name="requisicao">Usuário responsável.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Responsável atribuído.</response>
     /// <response code="404">OS inexistente.</response>
@@ -382,10 +417,11 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType<OrdemServicoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OrdemServicoResponse>> AtribuirResponsavel(
+        [FromServices] AtribuirResponsavel casoDeUso,
         Guid id,
         [FromBody] AtribuirResponsavelRequest requisicao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.AtribuirResponsavelAsync(id, requisicao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(id, requisicao, cancellationToken));
 
     // -----------------------------------------------------------------
     // Consultas
@@ -393,17 +429,22 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
 
     /// <summary>Detalha uma OS, com itens, orçamento e linha do tempo.</summary>
     /// <param name="id">Identificador da OS.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">OS encontrada.</response>
     /// <response code="404">OS inexistente.</response>
     [HttpGet("{id:guid}")]
     [ProducesResponseType<OrdemServicoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<OrdemServicoResponse>> ObterPorId(Guid id, CancellationToken cancellationToken) =>
-        Ok(await servico.ObterPorIdAsync(id, cancellationToken));
+    public async Task<ActionResult<OrdemServicoResponse>> ObterPorId(
+        [FromServices] ObterOrdemServico casoDeUso,
+        Guid id,
+        CancellationToken cancellationToken) =>
+        Ok(await casoDeUso.PorIdAsync(id, cancellationToken));
 
     /// <summary>Detalha uma OS pelo número legível.</summary>
     /// <param name="numero">Número no formato OS-AAAA-NNNNNN.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">OS encontrada.</response>
     /// <response code="404">OS inexistente.</response>
@@ -411,9 +452,10 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [ProducesResponseType<OrdemServicoResponse>(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<OrdemServicoResponse>> ObterPorNumero(
+        [FromServices] ObterOrdemServico casoDeUso,
         string numero,
         CancellationToken cancellationToken) =>
-        Ok(await servico.ObterPorNumeroAsync(numero, cancellationToken));
+        Ok(await casoDeUso.PorNumeroAsync(numero, cancellationToken));
 
     /// <summary>Lista Ordens de Serviço com filtros e paginação.</summary>
     /// <param name="status">Restringe a uma situação.</param>
@@ -422,11 +464,13 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     /// <param name="de">Data inicial de abertura.</param>
     /// <param name="ate">Data final de abertura.</param>
     /// <param name="paginacao">Página e tamanho de página.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Página de Ordens de Serviço, da mais recente à mais antiga.</response>
     [HttpGet]
     [ProducesResponseType<ResultadoPaginado<OrdemServicoResumoResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ResultadoPaginado<OrdemServicoResumoResponse>>> Listar(
+        [FromServices] ListarOrdensServico casoDeUso,
         [FromQuery] StatusOrdemServico? status,
         [FromQuery] Guid? clienteId,
         [FromQuery] Guid? veiculoId,
@@ -434,9 +478,10 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
         [FromQuery] DateTimeOffset? ate,
         [FromQuery] ParametrosDePaginacao paginacao,
         CancellationToken cancellationToken) =>
-        Ok(await servico.ListarAsync(status, clienteId, veiculoId, de, ate, paginacao, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(status, clienteId, veiculoId, de, ate, paginacao, cancellationToken));
 
     /// <summary>Expira orçamentos vencidos e cancela as respectivas Ordens de Serviço.</summary>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <response code="200">Quantidade de orçamentos expirados.</response>
     /// <remarks>
@@ -447,6 +492,8 @@ public sealed class OrdensServicoController(IServicoDeOrdensServico servico) : C
     [HttpPost("manutencao/expirar-orcamentos")]
     [Authorize(Policy = PoliticasDeAutorizacao.Administrar)]
     [ProducesResponseType<int>(StatusCodes.Status200OK)]
-    public async Task<ActionResult<int>> ExpirarOrcamentosVencidos(CancellationToken cancellationToken) =>
-        Ok(await servico.ExpirarOrcamentosVencidosAsync(cancellationToken));
+    public async Task<ActionResult<int>> ExpirarOrcamentosVencidos(
+        [FromServices] ExpirarOrcamentosVencidos casoDeUso,
+        CancellationToken cancellationToken) =>
+        Ok(await casoDeUso.ExecutarAsync(cancellationToken));
 }

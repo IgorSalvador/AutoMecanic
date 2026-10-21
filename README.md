@@ -198,7 +198,7 @@ banco e sem configuração.
 | Decisão | Justificativa resumida |
 |---|---|
 | **PostgreSQL 17** | Licença livre; `xmin` nativo para concorrência otimista; `INSERT … ON CONFLICT … RETURNING` para numeração atômica; imagem de 90 MB. [Detalhamento](docs/05-arquitetura.md#adr-01--postgresql-como-banco-de-dados) |
-| **Serviços de aplicação**, não CQRS | O requisito pede camadas. Um mediador acrescentaria uma classe por operação sem resolver problema real |
+| **Um caso de uso por classe**, sem mediador | Cada operação da OS é uma classe coesa e testável isoladamente; chamada direta, sem MediatR, porque um *pipeline* de *behaviors* não resolveria problema real |
 | **Reserva de estoque** | Baixar na inclusão sumiria com peça de orçamento reprovado; baixar só na aprovação deixaria duas OS venderem a mesma peça |
 | **Eventos antes do commit** | Torna atômico o par saldo + lançamento no razão |
 | **Testcontainers** | Conversores de VO, `CHECK`, `xmin` e `ILIKE` não existem fora do PostgreSQL |
