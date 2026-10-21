@@ -1,4 +1,4 @@
-using AutoMecanic.Application.OrdensServico;
+using AutoMecanic.Application.OrdensServico.CasosDeUso;
 
 namespace AutoMecanic.Api;
 
@@ -53,8 +53,8 @@ internal static class TarefasAvulsas
         using var escopo = servicos.CreateScope();
 
         var expirados = await escopo.ServiceProvider
-            .GetRequiredService<IServicoDeOrdensServico>()
-            .ExpirarOrcamentosVencidosAsync(cancellationToken);
+            .GetRequiredService<ExpirarOrcamentosVencidos>()
+            .ExecutarAsync(cancellationToken);
 
         logger.LogInformation("Rotina de expiração concluída: {Total} orçamento(s) expirado(s).", expirados);
     }

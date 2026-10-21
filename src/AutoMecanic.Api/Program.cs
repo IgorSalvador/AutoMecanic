@@ -53,6 +53,7 @@ builder.Services.AdicionarCamadaDeInfraestrutura(builder.Configuration);
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IUsuarioAtual, UsuarioAtual>();
 builder.Services.AddScoped<SemeadorDeDados>();
+builder.Services.AddScoped<SemeadorDeOrdensDeServico>();
 
 // ---------------------------------------------------------------------------
 // MVC e serialização

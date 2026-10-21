@@ -1,4 +1,4 @@
-using AutoMecanic.Application.OrdensServico;
+using AutoMecanic.Application.OrdensServico.CasosDeUso;
 using AutoMecanic.Application.OrdensServico.Dtos;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -16,11 +16,12 @@ namespace AutoMecanic.Api.Controllers;
 [Route("api/v1/acompanhamento")]
 [Produces("application/json")]
 [AllowAnonymous]
-public sealed class AcompanhamentoController(IServicoDeOrdensServico servico) : ControllerBase
+public sealed class AcompanhamentoController : ControllerBase
 {
     /// <summary>Consulta a situação de uma Ordem de Serviço.</summary>
     /// <param name="numero">Número da OS no formato OS-AAAA-NNNNNN, informado no comprovante.</param>
     /// <param name="documento">CPF ou CNPJ do cliente titular da OS.</param>
+    /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
     /// <returns>Situação atual, serviços contratados, valor do orçamento e linha do tempo.</returns>
     /// <response code="200">Ordem de Serviço localizada.</response>
@@ -47,8 +48,9 @@ public sealed class AcompanhamentoController(IServicoDeOrdensServico servico) : 
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<ActionResult<AcompanhamentoResponse>> Acompanhar(
+        [FromServices] AcompanharOrdemServico casoDeUso,
         [FromQuery] string numero,
         [FromQuery] string documento,
         CancellationToken cancellationToken) =>
-        Ok(await servico.AcompanharAsync(numero, documento, cancellationToken));
+        Ok(await casoDeUso.ExecutarAsync(numero, documento, cancellationToken));
 }

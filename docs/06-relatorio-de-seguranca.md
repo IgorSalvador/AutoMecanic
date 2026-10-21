@@ -166,7 +166,7 @@ para consultar `/health/pronto` — sem introduzir nenhuma ferramenta externa
 - A consulta pública de acompanhamento exige **número da OS e documento do cliente juntos**, e o serviço confere se o documento corresponde ao cliente da OS:
 
 ```csharp
-// Application/OrdensServico/ServicoDeOrdensServico.cs
+// Application/OrdensServico/CasosDeUso/Consultas/AcompanharOrdemServico.cs
 if (ordem is null || cliente is null || cliente.Documento != documento)
 {
     throw new RecursoNaoEncontradoException(

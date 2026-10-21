@@ -24,7 +24,7 @@ flowchart TB
     end
 
     subgraph APP["⚙️ AutoMecanic.Application — Casos de uso"]
-        SVC["Serviços de aplicação<br/><i>orquestração</i>"]
+        SVC["Casos de uso e serviços de aplicação<br/><i>orquestração</i>"]
         DTO["DTOs de entrada e saída"]
         VAL["Validadores"]
         PORT["<b>Portas</b><br/><i>interfaces de repositório,<br/>UoW, hash, token, relógio</i>"]
@@ -152,20 +152,35 @@ deles está no escopo do MVP.
 
 ---
 
-### ADR-02 · Serviços de aplicação em vez de CQRS com mediador
+### ADR-02 · Um caso de uso por classe, sem mediador
+
+> **Revisado na Fase 2.** A decisão original — um serviço de aplicação por contexto — está
+> preservada abaixo, porque explica por que o mediador continua de fora.
 
 **Contexto.** A alternativa popular seria MediatR com um *handler* por comando.
 
-**Decisão.** Um serviço de aplicação por contexto, com um método por caso de uso.
+**Decisão original (Fase 1).** Um serviço de aplicação por contexto, com um método por caso de uso.
 
 **Por quê.** O requisito pede *arquitetura em camadas*, não CQRS. Com este volume de casos de
 uso, o mediador acrescentaria uma classe e um arquivo por operação sem resolver nenhum
 problema real — a única motivação seria a moda. O ganho de um pipeline de *behaviors* já é
 obtido, mais simplesmente, com um filtro de ação para validação e um middleware para exceções.
 
-**Custo.** Serviços maiores. `ServicoDeOrdensServico` tem ~550 linhas — o limite do
-confortável. Se crescer, o caminho natural é dividir por subfluxo (orçamento, execução), não
-introduzir um mediador.
+**Custo.** Serviços maiores. `ServicoDeOrdensServico` chegou a ~665 linhas e 22 operações.
+
+**Revisão (Fase 2).** O contexto central, Ordem de Serviço, passou a ter **uma classe por caso
+de uso** (`Application/OrdensServico/CasosDeUso`), agrupadas em pastas por etapa do fluxo
+(abertura, diagnóstico, composição, orçamento, execução, consultas). Cada classe expõe uma
+operação (`ExecutarAsync`) e recebe só o que usa; o que várias compartilham — carregar e
+persistir a OS, reservar e devolver peças, abrir a OS — fica em três colaboradores do
+namespace `Apoio`. O controlador recebe o caso de uso por `[FromServices]` na própria ação.
+
+Continua **sem mediador**: a chamada é direta, o tipo do caso de uso aparece na assinatura e o
+"vá para a definição" leva ao código que executa. Os testes de arquitetura garantem a forma —
+casos de uso selados, sem dependência entre si, com poucos métodos.
+
+Os demais contextos (clientes, veículos, catálogo, estoque, identidade) mantêm serviços de
+aplicação: são coesos, com menos de 230 linhas cada, e dividi-los agora seria cerimônia.
 
 ---
 
@@ -400,6 +415,7 @@ AutoMecanic/
 │   │   ├── Abstractions/                 interfaces de repositório, UoW, serviços
 │   │   ├── Common/                       paginação, exceções
 │   │   ├── Validacao/                    validadores FluentValidation
+│   │   ├── OrdensServico/CasosDeUso/     um caso de uso por classe, por etapa do fluxo
 │   │   └── <contexto>/                   DTOs + serviço de aplicação
 │   ├── AutoMecanic.Infrastructure/    🔌 EF Core, PostgreSQL, BCrypt, JWT
 │   │   ├── Persistencia/
