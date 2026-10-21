@@ -156,11 +156,21 @@ Todas as requisições acima estão prontas em duas formas:
 - **[`AutoMecanic.http`](AutoMecanic.http)** — para quem prefere não sair do editor, com a
   extensão *REST Client* do VS Code.
 
-**Acompanhamento pelo cliente**, sem autenticação:
+**Autoatendimento do cliente**, sem autenticação — acompanhar a OS e responder ao orçamento
+recebido, sempre com o número da OS e o CPF/CNPJ do titular:
 
 ```http
-GET /api/v1/acompanhamento?numero=OS-2026-000001&documento=11144477735
+GET  /api/v1/acompanhamento?numero=OS-2026-000001&documento=11144477735
+
+POST /api/v1/acompanhamento/orcamento/aprovar
+{ "numero": "OS-2026-000001", "documento": "11144477735" }
+
+POST /api/v1/acompanhamento/orcamento/reprovar
+{ "numero": "OS-2026-000001", "documento": "11144477735", "motivo": "Vou pensar." }
 ```
+
+A aprovação tem o mesmo efeito da registrada pelo atendente: a OS entra em execução e as
+peças são baixadas. Documento que não confere recebe a mesma resposta de OS inexistente.
 
 ---
 
@@ -319,6 +329,7 @@ Todos os valores abaixo são lidos de variáveis de ambiente (duplo sublinhado s
 | `BancoDeDados__MigrarNaInicializacao` | `true` | Aplica migrações ao subir |
 | `LimiteDeTaxa__LoginPorMinuto` | `10` | Tentativas de login por origem |
 | `LimiteDeTaxa__GlobalPorMinuto` | `300` | Requisições por origem |
+| `LimiteDeTaxa__ClientePorMinuto` | `30` | Requisições por origem às rotas públicas do cliente |
 | `Cors__OrigensPermitidas__0` | — | Origens liberadas; **vazio libera nenhuma** |
 
 ---
@@ -330,8 +341,8 @@ Todos sob `/api/v1`. A documentação completa, com esquemas e exemplos, está n
 | Recurso | Endpoints | Autorização |
 |---|---|---|
 | **Autenticação** | `POST /autenticacao/login` | Anônimo |
-| **Acompanhamento** | `GET /acompanhamento?numero=&documento=` | Anônimo (número + documento) |
-| **Ordens de Serviço** | `POST /ordens-servico`, `/recepcao`, `/{id}/diagnostico/*`, `/{id}/servicos`, `/{id}/pecas`, `/{id}/orcamento/*`, `/{id}/finalizar`, `/{id}/entregar`, `/{id}/cancelar` | Atender · ExecutarServico |
+| **Acompanhamento** | `GET /acompanhamento?numero=&documento=`, `POST /acompanhamento/orcamento/aprovar`, `/orcamento/reprovar` | Anônimo (número + documento), limite de taxa próprio |
+| **Ordens de Serviço** | `POST /ordens-servico`, `/recepcao`, `GET /{id}/status`, `/{id}/diagnostico/*`, `/{id}/servicos`, `/{id}/pecas`, `/{id}/orcamento/*`, `/{id}/finalizar`, `/{id}/entregar`, `/{id}/cancelar` | Atender · ExecutarServico |
 | **Clientes** | CRUD + `/documento/{documento}` | Atender · Consultar |
 | **Veículos** | CRUD + `/placa/{placa}`, `/{id}/quilometragem`, `/{id}/transferir` | Atender · Consultar |
 | **Serviços** | CRUD + `/{id}/preco` | Administrar · Consultar |

@@ -92,3 +92,14 @@ public sealed record CancelarOrdemServicoRequest(string Motivo);
 /// <summary>Atribuição do responsável técnico pela OS.</summary>
 /// <param name="ResponsavelId">Usuário que passa a responder pela OS.</param>
 public sealed record AtribuirResponsavelRequest(Guid ResponsavelId);
+
+/// <summary>Aprovação do orçamento pelo próprio cliente, sem autenticação.</summary>
+/// <param name="Numero">Número da OS (OS-AAAA-NNNNNN), informado no e-mail do orçamento.</param>
+/// <param name="Documento">CPF ou CNPJ do cliente titular da OS.</param>
+public sealed record RespostaAoOrcamentoRequest(string Numero, string Documento);
+
+/// <summary>Recusa do orçamento pelo próprio cliente, sem autenticação.</summary>
+/// <param name="Numero">Número da OS (OS-AAAA-NNNNNN), informado no e-mail do orçamento.</param>
+/// <param name="Documento">CPF ou CNPJ do cliente titular da OS.</param>
+/// <param name="Motivo">Justificativa da recusa. Opcional.</param>
+public sealed record RecusaDoOrcamentoRequest(string Numero, string Documento, string? Motivo = null);

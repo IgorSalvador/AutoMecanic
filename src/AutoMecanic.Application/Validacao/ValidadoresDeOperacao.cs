@@ -2,7 +2,9 @@ using AutoMecanic.Application.Estoque.Dtos;
 using AutoMecanic.Application.Identidade.Dtos;
 using AutoMecanic.Application.OrdensServico.Dtos;
 using AutoMecanic.Application.Servicos.Dtos;
+using AutoMecanic.Domain.Abstractions;
 using AutoMecanic.Domain.Clientes.ValueObjects;
+using AutoMecanic.Domain.OrdensServico.ValueObjects;
 using AutoMecanic.Domain.Veiculos.ValueObjects;
 using FluentValidation;
 
@@ -277,4 +279,53 @@ public sealed class ValidadorDeRedefinirSenha : AbstractValidator<RedefinirSenha
             .NotEmpty()
             .Must(ValidadorDeCriarUsuario.SenhaAtendeAPolitica)
             .WithMessage(ValidadorDeCriarUsuario.MensagemDePolitica);
+}
+
+/// <summary>Validação da aprovação do orçamento pelo próprio cliente.</summary>
+public sealed class ValidadorDeRespostaAoOrcamento : AbstractValidator<RespostaAoOrcamentoRequest>
+{
+    public ValidadorDeRespostaAoOrcamento()
+    {
+        RuleFor(r => r.Numero).NumeroDeOrdemServicoValido();
+        RuleFor(r => r.Documento).DocumentoDoTitularValido();
+    }
+}
+
+/// <summary>Validação da recusa do orçamento pelo próprio cliente.</summary>
+public sealed class ValidadorDeRecusaDoOrcamento : AbstractValidator<RecusaDoOrcamentoRequest>
+{
+    public ValidadorDeRecusaDoOrcamento()
+    {
+        RuleFor(r => r.Numero).NumeroDeOrdemServicoValido();
+        RuleFor(r => r.Documento).DocumentoDoTitularValido();
+        RuleFor(r => r.Motivo).MaximumLength(500);
+    }
+}
+
+/// <summary>Regras dos dados com que o cliente prova ser o titular da OS.</summary>
+internal static class RegrasDoTitular
+{
+    public static IRuleBuilderOptions<T, string> NumeroDeOrdemServicoValido<T>(this IRuleBuilder<T, string> regra) =>
+        regra
+            .NotEmpty().WithMessage("Informe o número da Ordem de Serviço.")
+            .Must(EhNumeroValido).WithMessage("Número da OS inválido. Formato esperado: OS-AAAA-NNNNNN.");
+
+    public static IRuleBuilderOptions<T, string> DocumentoDoTitularValido<T>(this IRuleBuilder<T, string> regra) =>
+        regra
+            .NotEmpty().WithMessage("Informe o CPF ou CNPJ do titular da OS.")
+            .Must(documento => Documento.TentarCriar(documento, out _))
+            .WithMessage("CPF ou CNPJ inválido: verifique os dígitos verificadores.");
+
+    private static bool EhNumeroValido(string? numero)
+    {
+        try
+        {
+            NumeroOrdemServico.Analisar(numero);
+            return true;
+        }
+        catch (DomainException)
+        {
+            return false;
+        }
+    }
 }

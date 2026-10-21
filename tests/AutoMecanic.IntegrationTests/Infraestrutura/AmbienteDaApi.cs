@@ -73,6 +73,7 @@ public sealed class AmbienteDaApi : WebApplicationFactory<Program>, IAsyncLifeti
         // dispara de um único endereço o que, em produção, viriam de dezenas de máquinas.
         Definir("LimiteDeTaxa__LoginPorMinuto", "1000");
         Definir("LimiteDeTaxa__GlobalPorMinuto", "10000");
+        Definir("LimiteDeTaxa__ClientePorMinuto", "1000");
 
         Definir("Serilog__MinimumLevel__Default", "Warning");
     }

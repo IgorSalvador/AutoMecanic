@@ -11,7 +11,7 @@ namespace AutoMecanic.Application.OrdensServico.CasosDeUso;
 /// </summary>
 public sealed class ReprovarOrcamento(
     OperacaoSobreOrdemServico operacao,
-    ReservasDaOrdemServico reservas,
+    DecisaoDoOrcamento decisao,
     IUnitOfWork unitOfWork,
     ILogger<ReprovarOrcamento> logger)
 {
@@ -26,9 +26,7 @@ public sealed class ReprovarOrcamento(
         {
             var ordem = await operacao.ExigirAsync(id, ct);
 
-            ordem.ReprovarOrcamento(requisicao.Motivo);
-
-            await reservas.LiberarAsync(ordem, ct);
+            await decisao.ReprovarAsync(ordem, requisicao.Motivo, ct);
             await operacao.PersistirAsync(ordem, ct);
 
             logger.LogInformation("Orçamento da OS {Numero} reprovado pelo cliente.", ordem.Numero.Valor);
