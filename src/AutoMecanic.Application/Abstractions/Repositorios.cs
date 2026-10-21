@@ -1,4 +1,5 @@
 using AutoMecanic.Application.Common;
+using AutoMecanic.Application.OrdensServico.Dtos;
 using AutoMecanic.Domain.Clientes;
 using AutoMecanic.Domain.Clientes.ValueObjects;
 using AutoMecanic.Domain.Estoque;
@@ -122,6 +123,12 @@ public interface IRepositorioDeOrdensServico : IRepositorio<OrdemServico>
 {
     /// <summary>Carrega a OS com itens, orçamento e histórico — o agregado inteiro.</summary>
     Task<OrdemServico?> ObterCompletaPorIdAsync(Guid id, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Situação atual da OS, lida por projeção — sem carregar itens, orçamento nem histórico.
+    /// Nulo quando a OS não existe.
+    /// </summary>
+    Task<StatusDaOrdemServicoResponse?> ObterStatusAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>Busca pelo número legível informado pelo cliente (OS-AAAA-NNNNNN).</summary>
     Task<OrdemServico?> ObterPorNumeroAsync(string numero, CancellationToken cancellationToken = default);
