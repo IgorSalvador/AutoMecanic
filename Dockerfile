@@ -17,6 +17,7 @@ COPY src/AutoMecanic.Infrastructure/AutoMecanic.Infrastructure.csproj src/AutoMe
 COPY src/AutoMecanic.Api/AutoMecanic.Api.csproj                       src/AutoMecanic.Api/
 COPY tests/AutoMecanic.UnitTests/AutoMecanic.UnitTests.csproj                 tests/AutoMecanic.UnitTests/
 COPY tests/AutoMecanic.IntegrationTests/AutoMecanic.IntegrationTests.csproj   tests/AutoMecanic.IntegrationTests/
+COPY tests/AutoMecanic.ArchitectureTests/AutoMecanic.ArchitectureTests.csproj tests/AutoMecanic.ArchitectureTests/
 
 RUN dotnet restore src/AutoMecanic.Api/AutoMecanic.Api.csproj
 
