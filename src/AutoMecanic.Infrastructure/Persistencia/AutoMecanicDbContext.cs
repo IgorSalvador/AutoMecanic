@@ -6,6 +6,7 @@ using AutoMecanic.Domain.Identidade;
 using AutoMecanic.Domain.OrdensServico;
 using AutoMecanic.Domain.Servicos;
 using AutoMecanic.Domain.Veiculos;
+using AutoMecanic.Infrastructure.Notificacoes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 
@@ -33,6 +34,9 @@ public sealed class AutoMecanicDbContext(DbContextOptions<AutoMecanicDbContext> 
     public DbSet<OrdemServico> OrdensDeServico => Set<OrdemServico>();
 
     public DbSet<Usuario> Usuarios => Set<Usuario>();
+
+    /// <summary>Caixa de saída de e-mails (outbox).</summary>
+    public DbSet<MensagemDeSaida> MensagensDeSaida => Set<MensagemDeSaida>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

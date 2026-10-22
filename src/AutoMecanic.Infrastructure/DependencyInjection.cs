@@ -1,4 +1,5 @@
 using AutoMecanic.Application.Abstractions;
+using AutoMecanic.Infrastructure.Notificacoes;
 using AutoMecanic.Infrastructure.Persistencia;
 using AutoMecanic.Infrastructure.Persistencia.Repositorios;
 using AutoMecanic.Infrastructure.Seguranca;
@@ -78,6 +79,8 @@ public static class DependencyInjection
         services.AddSingleton<IServicoDeHashDeSenha, ServicoDeHashDeSenhaBCrypt>();
         services.AddScoped<IGeradorDeToken, GeradorDeTokenJwt>();
 
+        AdicionarNotificacoes(services, configuration);
+
         // A configuração de JWT é validada na inicialização: sem chave válida, a aplicação
         // falha ao subir em vez de aceitar tokens forjados em produção.
         services.AddOptions<OpcoesDeJwt>()
@@ -86,5 +89,34 @@ public static class DependencyInjection
             .ValidateOnStart();
 
         return services;
+    }
+
+    /// <summary>
+    /// E-mails ao cliente: a caixa de saída é sempre registrada (as mensagens são gravadas na
+    /// transação de cada mudança); o envio em segundo plano só sobe quando
+    /// <c>Notificacoes:Habilitadas</c> está ligado — e, nesse caso, a configuração SMTP é validada
+    /// na inicialização, para que um servidor mal configurado impeça a subida em vez de acumular
+    /// falhas silenciosas.
+    /// </summary>
+    private static void AdicionarNotificacoes(IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddOptions<OpcoesDeNotificacao>()
+            .Bind(configuration.GetSection(OpcoesDeNotificacao.SecaoDeConfiguracao));
+
+        services.AddOptions<OpcoesDaCaixaDeSaida>()
+            .Bind(configuration.GetSection(OpcoesDaCaixaDeSaida.SecaoDeConfiguracao));
+
+        var smtp = services.AddOptions<OpcoesDeSmtp>()
+            .Bind(configuration.GetSection(OpcoesDeSmtp.SecaoDeConfiguracao));
+
+        services.AddScoped<ICaixaDeSaidaDeEmails, CaixaDeSaidaDeEmails>();
+        services.AddScoped<ProcessadorDaCaixaDeSaida>();
+        services.AddSingleton<IEnviadorDeEmail, EnviadorDeEmailSmtp>();
+
+        if (configuration.GetValue($"{OpcoesDaCaixaDeSaida.SecaoDeConfiguracao}:{nameof(OpcoesDaCaixaDeSaida.Habilitadas)}", false))
+        {
+            smtp.ValidateDataAnnotations().ValidateOnStart();
+            services.AddHostedService<TrabalhadorDaCaixaDeSaida>();
+        }
     }
 }

@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using DotNet.Testcontainers.Builders;
+using DotNet.Testcontainers.Containers;
 using Testcontainers.PostgreSql;
 
 namespace AutoMecanic.IntegrationTests.Infraestrutura;
@@ -35,6 +37,24 @@ public sealed class AmbienteDaApi : WebApplicationFactory<Program>, IAsyncLifeti
         .WithCleanUp(true)
         .Build();
 
+    /// <summary>
+    /// Servidor SMTP de teste: recebe os e-mails de verdade, por SMTP, e os expõe por uma API HTTP
+    /// para as verificações. É o mesmo Mailpit do ambiente de desenvolvimento.
+    /// </summary>
+    private readonly IContainer _mailpit = new ContainerBuilder("axllent/mailpit:v1.31.3")
+        .WithPortBinding(PortaSmtp, true)
+        .WithPortBinding(PortaHttp, true)
+        .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(r => r.ForPort(PortaHttp).ForPath("/livez")))
+        .WithCleanUp(true)
+        .Build();
+
+    private const ushort PortaSmtp = 1025;
+
+    private const ushort PortaHttp = 8025;
+
+    /// <summary>Endereço da API HTTP do Mailpit, para consultar os e-mails recebidos.</summary>
+    public Uri UrlDoMailpit => new($"http://{_mailpit.Hostname}:{_mailpit.GetMappedPublicPort(PortaHttp)}");
+
     /// <summary>Opções de serialização espelhando as da API (enums por nome, camelCase).</summary>
     public static JsonSerializerOptions Json { get; } = new(JsonSerializerDefaults.Web)
     {
@@ -53,7 +73,7 @@ public sealed class AmbienteDaApi : WebApplicationFactory<Program>, IAsyncLifeti
     /// </summary>
     public async Task InitializeAsync()
     {
-        await _banco.StartAsync();
+        await Task.WhenAll(_banco.StartAsync(), _mailpit.StartAsync());
 
         Definir("ConnectionStrings__PostgreSQL", _banco.GetConnectionString());
 
@@ -75,6 +95,14 @@ public sealed class AmbienteDaApi : WebApplicationFactory<Program>, IAsyncLifeti
         Definir("LimiteDeTaxa__GlobalPorMinuto", "10000");
         Definir("LimiteDeTaxa__ClientePorMinuto", "1000");
 
+        // E-mail: SMTP real (Mailpit), mas sem o processo em segundo plano — os testes disparam o
+        // processamento da caixa de saída quando querem, para verificar o resultado sem esperas.
+        Definir("Notificacoes__Habilitadas", "false");
+        Definir("Smtp__Host", _mailpit.Hostname);
+        Definir("Smtp__Porta", _mailpit.GetMappedPublicPort(PortaSmtp).ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Definir("Smtp__Seguranca", "Nenhuma");
+        Definir("Smtp__Remetente", "oficina@automecanic.com.br");
+
         Definir("Serilog__MinimumLevel__Default", "Warning");
     }
 
@@ -82,6 +110,7 @@ public sealed class AmbienteDaApi : WebApplicationFactory<Program>, IAsyncLifeti
     {
         await base.DisposeAsync();
         await _banco.DisposeAsync();
+        await _mailpit.DisposeAsync();
     }
 
     /// <summary>
