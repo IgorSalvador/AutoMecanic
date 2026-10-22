@@ -479,16 +479,26 @@ public sealed class OrdensServicoController : ControllerBase
         CancellationToken cancellationToken) =>
         Ok(await casoDeUso.PorNumeroAsync(numero, cancellationToken));
 
-    /// <summary>Lista Ordens de Serviço com filtros e paginação.</summary>
-    /// <param name="status">Restringe a uma situação.</param>
+    /// <summary>
+    /// Fila de trabalho: Ordens de Serviço por prioridade de atendimento, das mais antigas para
+    /// as mais novas dentro de cada situação.
+    /// </summary>
+    /// <param name="status">Restringe a uma situação. Informada, vale mesmo para as encerradas.</param>
     /// <param name="clienteId">Restringe a um cliente.</param>
     /// <param name="veiculoId">Restringe a um veículo.</param>
     /// <param name="de">Data inicial de abertura.</param>
     /// <param name="ate">Data final de abertura.</param>
+    /// <param name="incluirEncerradas">Inclui finalizadas, entregues e canceladas. Padrão: <c>false</c>.</param>
     /// <param name="paginacao">Página e tamanho de página.</param>
     /// <param name="casoDeUso">Caso de uso executado pela ação.</param>
     /// <param name="cancellationToken">Token de cancelamento.</param>
-    /// <response code="200">Página de Ordens de Serviço, da mais recente à mais antiga.</response>
+    /// <response code="200">Página de Ordens de Serviço na ordem da fila de atendimento.</response>
+    /// <remarks>
+    /// Ordem: <b>Em execução</b>, <b>Aguardando aprovação</b>, <b>Em diagnóstico</b> e <b>Recebida</b>;
+    /// dentro de cada situação, a OS mais antiga primeiro. Finalizadas, entregues e canceladas
+    /// saem da listagem por padrão — a exclusão é só da fila, nenhuma OS é apagada — e aparecem
+    /// ao final com <c>incluirEncerradas=true</c>.
+    /// </remarks>
     [HttpGet]
     [ProducesResponseType<ResultadoPaginado<OrdemServicoResumoResponse>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<ResultadoPaginado<OrdemServicoResumoResponse>>> Listar(
@@ -499,8 +509,12 @@ public sealed class OrdensServicoController : ControllerBase
         [FromQuery] DateTimeOffset? de,
         [FromQuery] DateTimeOffset? ate,
         [FromQuery] ParametrosDePaginacao paginacao,
-        CancellationToken cancellationToken) =>
-        Ok(await casoDeUso.ExecutarAsync(status, clienteId, veiculoId, de, ate, paginacao, cancellationToken));
+        CancellationToken cancellationToken,
+        [FromQuery] bool incluirEncerradas = false) =>
+        Ok(await casoDeUso.ExecutarAsync(
+            new FiltroDeOrdensServico(status, clienteId, veiculoId, de, ate, incluirEncerradas),
+            paginacao,
+            cancellationToken));
 
     /// <summary>Expira orçamentos vencidos e cancela as respectivas Ordens de Serviço.</summary>
     /// <param name="casoDeUso">Caso de uso executado pela ação.</param>

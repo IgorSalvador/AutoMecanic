@@ -156,6 +156,11 @@ Todas as requisições acima estão prontas em duas formas:
 - **[`AutoMecanic.http`](AutoMecanic.http)** — para quem prefere não sair do editor, com a
   extensão *REST Client* do VS Code.
 
+**Fila de trabalho** — `GET /api/v1/ordens-servico` lista as OS por prioridade de atendimento
+(*Em execução* > *Aguardando aprovação* > *Em diagnóstico* > *Recebida*), das mais antigas para
+as mais novas dentro de cada situação. Finalizadas, entregues e canceladas saem da fila — nada é
+apagado — e voltam com `incluirEncerradas=true` ou pedindo a situação em `status`.
+
 **Autoatendimento do cliente**, sem autenticação — acompanhar a OS e responder ao orçamento
 recebido, sempre com o número da OS e o CPF/CNPJ do titular:
 
@@ -342,7 +347,7 @@ Todos sob `/api/v1`. A documentação completa, com esquemas e exemplos, está n
 |---|---|---|
 | **Autenticação** | `POST /autenticacao/login` | Anônimo |
 | **Acompanhamento** | `GET /acompanhamento?numero=&documento=`, `POST /acompanhamento/orcamento/aprovar`, `/orcamento/reprovar` | Anônimo (número + documento), limite de taxa próprio |
-| **Ordens de Serviço** | `POST /ordens-servico`, `/recepcao`, `GET /{id}/status`, `/{id}/diagnostico/*`, `/{id}/servicos`, `/{id}/pecas`, `/{id}/orcamento/*`, `/{id}/finalizar`, `/{id}/entregar`, `/{id}/cancelar` | Atender · ExecutarServico |
+| **Ordens de Serviço** | `GET /ordens-servico` (fila priorizada), `POST /ordens-servico`, `/recepcao`, `GET /{id}/status`, `/{id}/diagnostico/*`, `/{id}/servicos`, `/{id}/pecas`, `/{id}/orcamento/*`, `/{id}/finalizar`, `/{id}/entregar`, `/{id}/cancelar` | Atender · ExecutarServico |
 | **Clientes** | CRUD + `/documento/{documento}` | Atender · Consultar |
 | **Veículos** | CRUD + `/placa/{placa}`, `/{id}/quilometragem`, `/{id}/transferir` | Atender · Consultar |
 | **Serviços** | CRUD + `/{id}/preco` | Administrar · Consultar |

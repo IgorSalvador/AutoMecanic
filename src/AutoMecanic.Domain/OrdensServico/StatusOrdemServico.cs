@@ -65,6 +65,30 @@ public enum StatusOrcamento
 /// <summary>Métodos de apoio à máquina de estados da Ordem de Serviço.</summary>
 public static class StatusOrdemServicoExtensions
 {
+    /// <summary>
+    /// Ordem de atendimento da fila operacional: primeiro o que já está na rampa, depois o que
+    /// depende de resposta do cliente, depois o que está sendo avaliado e, por fim, o que acabou
+    /// de chegar. Situações fora desta lista (encerradas) vêm depois, na ordem do ciclo de vida.
+    /// </summary>
+    public static IReadOnlyList<StatusOrdemServico> PrioridadeDeAtendimento { get; } =
+    [
+        StatusOrdemServico.EmExecucao,
+        StatusOrdemServico.AguardandoAprovacao,
+        StatusOrdemServico.EmDiagnostico,
+        StatusOrdemServico.Recebida
+    ];
+
+    /// <summary>
+    /// Situações que saem da fila de trabalho da oficina: o serviço já terminou (finalizada,
+    /// entregue) ou não vai acontecer (cancelada).
+    /// </summary>
+    public static IReadOnlyList<StatusOrdemServico> ForaDaFila { get; } =
+    [
+        StatusOrdemServico.Finalizada,
+        StatusOrdemServico.Entregue,
+        StatusOrdemServico.Cancelada
+    ];
+
     /// <summary>Estados a partir dos quais nenhuma transição é mais possível.</summary>
     public static bool EhTerminal(this StatusOrdemServico status) =>
         status is StatusOrdemServico.Entregue or StatusOrdemServico.Cancelada;
