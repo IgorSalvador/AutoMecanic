@@ -471,7 +471,7 @@ public sealed class OrdemServico : AggregateRoot
             ResponsavelId);
 
         RegistrarEvento(new OrcamentoEnviadoAoCliente(
-            Id, orcamento.Id, ClienteId, orcamento.ValorTotal.Valor, orcamento.ValidoAte!.Value));
+            Id, orcamento.Id, ClienteId, orcamento.ValorTotal.Valor, orcamento.ValidoAte!.Value, Numero.Valor));
     }
 
     /// <summary>
@@ -673,7 +673,7 @@ public sealed class OrdemServico : AggregateRoot
         AtualizadaEm = RelogioDoDominio.Agora;
 
         RegistrarTransicao(anterior, novoStatus, observacao, usuarioId);
-        RegistrarEvento(new StatusDaOrdemAlterado(Id, Numero.Valor, anterior, novoStatus));
+        RegistrarEvento(new StatusDaOrdemAlterado(Id, Numero.Valor, anterior, novoStatus, ClienteId));
     }
 
     private void RegistrarTransicao(

@@ -571,6 +571,88 @@ namespace AutoMecanic.Infrastructure.Persistencia.Migracoes
                         });
                 });
 
+            modelBuilder.Entity("AutoMecanic.Infrastructure.Notificacoes.MensagemDeSaida", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Assunto")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("assunto");
+
+                    b.Property<string>("CorpoHtml")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("corpo_html");
+
+                    b.Property<string>("CorpoTexto")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("corpo_texto");
+
+                    b.Property<DateTimeOffset>("CriadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("criada_em");
+
+                    b.Property<string>("Destinatario")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)")
+                        .HasColumnName("destinatario");
+
+                    b.Property<DateTimeOffset?>("EnviadaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviada_em");
+
+                    b.Property<string>("NomeDoDestinatario")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("nome_do_destinatario");
+
+                    b.Property<DateTimeOffset>("ProximaTentativaEm")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("proxima_tentativa_em");
+
+                    b.Property<string>("Referencia")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)")
+                        .HasColumnName("referencia");
+
+                    b.Property<string>("Situacao")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("situacao");
+
+                    b.Property<int>("Tentativas")
+                        .HasColumnType("integer")
+                        .HasColumnName("tentativas");
+
+                    b.Property<string>("UltimoErro")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("ultimo_erro");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mensagem_saida");
+
+                    b.HasIndex("Referencia")
+                        .HasDatabaseName("ix_mensagem_saida_referencia");
+
+                    b.HasIndex("Situacao", "ProximaTentativaEm")
+                        .HasDatabaseName("ix_mensagem_saida_situacao_proxima_tentativa_em");
+
+                    b.ToTable("mensagem_saida", "automecanic", t =>
+                        {
+                            t.HasComment("Caixa de saída de e-mails (outbox): gravada na transação da mudança, enviada depois.");
+                        });
+                });
+
             modelBuilder.Entity("AutoMecanic.Infrastructure.Persistencia.SequenciaOrdemServico", b =>
                 {
                     b.Property<int>("Ano")

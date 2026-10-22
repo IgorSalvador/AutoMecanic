@@ -336,8 +336,28 @@ Todos os valores abaixo são lidos de variáveis de ambiente (duplo sublinhado s
 | `LimiteDeTaxa__GlobalPorMinuto` | `300` | Requisições por origem |
 | `LimiteDeTaxa__ClientePorMinuto` | `30` | Requisições por origem às rotas públicas do cliente |
 | `Cors__OrigensPermitidas__0` | — | Origens liberadas; **vazio libera nenhuma** |
+| `Notificacoes__Habilitadas` | `false` | Liga o envio dos e-mails da caixa de saída (as mensagens são sempre registradas) |
+| `Notificacoes__UrlPublicaDaApi` | — | Endereço da API citado nos e-mails, para o cliente responder ao orçamento |
+| `Smtp__Host` · `Smtp__Porta` · `Smtp__Seguranca` | `smtp.gmail.com` · `587` · `StartTls` | Servidor SMTP; `Nenhuma` apenas para o Mailpit local |
+| `Smtp__Usuario` · `Smtp__Senha` | — | Conta e **senha de app** do provedor. Segredo: nunca no repositório |
+| `Smtp__Remetente` | — | Endereço do remetente; obrigatório com as notificações ligadas |
 
 ---
+
+### E-mails ao cliente
+
+A cada mudança de situação da OS, o cliente recebe um e-mail: abertura, diagnóstico, orçamento
+(com valor, validade e como responder), execução, finalização, entrega ou cancelamento.
+
+O envio usa uma **caixa de saída** (*outbox*): a mensagem é gravada na mesma transação da mudança
+e um processo em segundo plano a envia por SMTP depois do commit. Assim, o e-mail sai se e somente
+se a mudança foi gravada, e não se perde quando o autoescalonamento remove uma réplica. Com várias
+réplicas, `FOR UPDATE SKIP LOCKED` garante que cada mensagem saia uma única vez; falhas de envio
+são repetidas com espera crescente, até 5 tentativas.
+
+Qualquer servidor SMTP serve. Para o Gmail, ative a verificação em duas etapas na conta, gere uma
+**senha de app** e configure `Smtp__Usuario` e `Smtp__Senha` com ela. Em desenvolvimento, o
+[Mailpit](https://mailpit.axllent.org) recebe os e-mails sem enviá-los de verdade.
 
 ## Endpoints
 

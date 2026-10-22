@@ -61,7 +61,8 @@ public sealed record OrcamentoEnviadoAoCliente(
     Guid OrcamentoId,
     Guid ClienteId,
     decimal ValorTotal,
-    DateTimeOffset ValidoAte) : DomainEvent;
+    DateTimeOffset ValidoAte,
+    string Numero) : DomainEvent;
 
 /// <summary>O cliente aprovou o orçamento. Autoriza a execução e o consumo das peças.</summary>
 public sealed record OrcamentoAprovadoPeloCliente(
@@ -105,4 +106,5 @@ public sealed record StatusDaOrdemAlterado(
     Guid OrdemServicoId,
     string Numero,
     StatusOrdemServico? StatusAnterior,
-    StatusOrdemServico StatusAtual) : DomainEvent;
+    StatusOrdemServico StatusAtual,
+    Guid ClienteId) : DomainEvent;
