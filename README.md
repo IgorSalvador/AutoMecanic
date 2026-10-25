@@ -195,6 +195,7 @@ peças são baixadas. Documento que não confere recebe a mesma resposta de OS i
 | [Modelo de Domínio](docs/04-modelo-de-dominio.md) | Agregados, entidades, objetos de valor e invariantes |
 | [Arquitetura](docs/05-arquitetura.md) | Camadas e as decisões técnicas, com seus custos |
 | [Relatório de segurança](docs/06-relatorio-de-seguranca.md) | Análise de vulnerabilidades e OWASP API Top 10 |
+| [Guia de testes](docs/07-guia-de-testes.md) | Como testar tudo: testes automatizados, compose, Kubernetes local, HPA e roteiro da AWS |
 | [Documento de entrega](docs/ENTREGA.md) | Modelo para exportação em PDF |
 | [Coleção Postman](postman/README.md) | Como importar, executar e regerar a coleção |
 
