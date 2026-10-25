@@ -7,7 +7,7 @@ oficina mecânica de médio porte.
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)](https://www.postgresql.org/)
-[![Testes](https://img.shields.io/badge/testes-486%20verdes-success)]()
+[![Testes](https://img.shields.io/badge/testes-598%20verdes-success)]()
 [![Cobertura](https://img.shields.io/badge/cobertura-92.2%25-success)]()
 [![Vulnerabilidades](https://img.shields.io/badge/CVEs%20cr%C3%ADticas%2Faltas-0-success)]()
 
@@ -59,6 +59,11 @@ automaticamente.
 | **Documentação interativa (Swagger)** | http://localhost:8080/swagger |
 | Prontidão (verifica o banco) | http://localhost:8080/health/pronto |
 | Vivacidade (só o processo) | http://localhost:8080/health/vivo |
+| **Caixa de entrada dos e-mails (Mailpit)** | http://localhost:8025 |
+
+O compose sobe também o [Mailpit](https://mailpit.axllent.org), um servidor SMTP de
+desenvolvimento: os e-mails de mudança de situação da OS chegam nele e não saem para ninguém.
+Para enviar de verdade (Gmail, por exemplo), ajuste as variáveis `SMTP_*` do `.env`.
 
 ### Primeiro acesso
 
@@ -228,9 +233,10 @@ banco e sem configuração.
 ## Testes e qualidade
 
 ```bash
-dotnet test                                             # 486 verificações
-dotnet test tests/AutoMecanic.UnitTests                 # 439, ~3 s, sem I/O
-dotnet test tests/AutoMecanic.IntegrationTests          # 47, PostgreSQL real
+dotnet test                                             # 598 verificações
+dotnet test tests/AutoMecanic.UnitTests                 # 475, ~3 s, sem I/O
+dotnet test tests/AutoMecanic.ArchitectureTests         # 22, regras de dependência entre camadas
+dotnet test tests/AutoMecanic.IntegrationTests          # 101, PostgreSQL real (exige Docker)
 ```
 
 Relatório de cobertura:
@@ -272,6 +278,28 @@ estoque. Foram eles que encontraram os três defeitos descritos no
 
 **Resultado da varredura:** 0 vulnerabilidades críticas ou altas; 0 no código e nas
 dependências .NET. [Relatório completo](docs/06-relatorio-de-seguranca.md).
+
+---
+
+## Kubernetes local (kind)
+
+Os mesmos manifestos que irão para a nuvem rodam num cluster [kind](https://kind.sigs.k8s.io):
+API com 2 a 6 réplicas sob HPA, Job de migração, CronJob de expiração de orçamentos,
+PostgreSQL e Mailpit. Requisitos: Docker, `kind` e `kubectl`.
+
+```powershell
+.\k8s\overlays\local\subir-cluster.ps1            # Windows (no Linux/macOS: ./subir-cluster.sh)
+.\k8s\overlays\local\subir-cluster.ps1 -Destruir  # remove o cluster
+```
+
+API e Swagger em http://localhost:8080, Mailpit em http://localhost:8025. Para ver o HPA
+escalar, aplique o teste de carga e acompanhe as réplicas:
+
+```bash
+kubectl apply -k k8s/overlays/local/carga
+kubectl -n automecanic get hpa -w
+kubectl delete -k k8s/overlays/local/carga     # limpa e permite repetir
+```
 
 ---
 
@@ -332,6 +360,10 @@ Todos os valores abaixo são lidos de variáveis de ambiente (duplo sublinhado s
 | `Seed__SenhaDoAdministrador` | — | Senha do admin inicial; sem ela, o seed é ignorado |
 | `Seed__IncluirDadosDeDemonstracao` | `false` | Cria clientes e veículos de exemplo |
 | `BancoDeDados__MigrarNaInicializacao` | `true` | Aplica migrações ao subir |
+| `Hospedagem__UsarCabecalhosEncaminhados` | `false` | Confia em `X-Forwarded-For/Proto` (atrás de load balancer), para o limite de taxa ver o IP real. Ligue **só** atrás de um proxy |
+| `Hospedagem__RedirecionarParaHttps` | `true` | Redireciona HTTP para HTTPS fora de desenvolvimento; desligue quando o TLS termina no balanceador |
+| `Hospedagem__TempoDeEncerramentoEmSegundos` | `30` | Espera, ao receber o sinal de encerramento, pelas requisições e pelo envio de e-mail em curso |
+| `Swagger__Habilitado` | `true` | Publica o Swagger e o redirecionamento da raiz para ele |
 | `LimiteDeTaxa__LoginPorMinuto` | `10` | Tentativas de login por origem |
 | `LimiteDeTaxa__GlobalPorMinuto` | `300` | Requisições por origem |
 | `LimiteDeTaxa__ClientePorMinuto` | `30` | Requisições por origem às rotas públicas do cliente |
@@ -388,9 +420,13 @@ AutoMecanic/
 │   ├── AutoMecanic.Infrastructure/   🔌 EF Core, PostgreSQL, BCrypt, JWT
 │   └── AutoMecanic.Api/              📡 REST, Swagger, middlewares
 ├── tests/
-│   ├── AutoMecanic.UnitTests/        439 verificações
-│   └── AutoMecanic.IntegrationTests/  47 verificações com Testcontainers
-├── docs/                             documentação DDD e relatório de segurança
+│   ├── AutoMecanic.UnitTests/        475 verificações
+│   ├── AutoMecanic.ArchitectureTests/ 22 verificações de dependência entre camadas
+│   └── AutoMecanic.IntegrationTests/ 101 verificações com Testcontainers
+├── k8s/
+│   ├── base/                         manifestos comuns (Kustomize)
+│   └── overlays/local/               cluster kind, Mailpit, PostgreSQL e teste de carga
+├── docs/                             documentação DDD, relatório de segurança e plano da Fase 2
 ├── Dockerfile · docker-compose.yml · .env.example
 └── Directory.Build.props · Directory.Packages.props · coverlet.runsettings
 ```
