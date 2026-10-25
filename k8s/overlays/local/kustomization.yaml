@@ -60,6 +60,14 @@ patches:
       - op: replace
         path: /data/Seed__IncluirDadosDeDemonstracao
         value: "true"
+      # O teste de carga (carga/) parte de um único IP dentro do cluster: com os limites de
+      # produção ele só receberia 429. Local não é exposto à internet.
+      - op: replace
+        path: /data/LimiteDeTaxa__LoginPorMinuto
+        value: "100000"
+      - op: replace
+        path: /data/LimiteDeTaxa__GlobalPorMinuto
+        value: "100000"
 
   # No kind o tráfego entra por uma porta de nó (mapeada para 8080 em kind-config.yaml).
   - target:

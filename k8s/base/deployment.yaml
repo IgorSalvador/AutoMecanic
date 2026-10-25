@@ -42,11 +42,13 @@ spec:
                 name: automecanic-api
             - secretRef:
                 name: automecanic-api
-          # O HPA calcula a porcentagem de uso sobre os requests.
+          # O HPA calcula a porcentagem de uso sobre os requests. A memória é folgada de propósito:
+          # depois de um pico o .NET retém ~130Mi por pod, e com um request menor a utilização
+          # ficaria acima do alvo de 80% e o HPA nunca voltaria às 2 réplicas.
           resources:
             requests:
               cpu: 100m
-              memory: 192Mi
+              memory: 256Mi
             limits:
               cpu: 500m
               memory: 512Mi

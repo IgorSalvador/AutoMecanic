@@ -1,0 +1,16 @@
+# Teste de carga do cluster local, aplicado À PARTE do overlay principal (não faz parte do
+# ambiente): só existe enquanto alguém estiver demonstrando o HPA.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: automecanic
+
+resources:
+  - job-k6.yaml
+
+configMapGenerator:
+  - name: k6-carga
+    files:
+      - k6-carga.js
+    options:
+      disableNameSuffixHash: true
