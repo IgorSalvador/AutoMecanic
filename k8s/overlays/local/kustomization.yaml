@@ -1,0 +1,110 @@
+# Cluster local (kind): PostgreSQL e Mailpit dentro do cluster, sem nada externo.
+#
+#   ./k8s/overlays/local/subir-cluster.sh      (ou subir-cluster.ps1 no Windows)
+#
+# Acessos pelo computador (mapeados em kind-config.yaml):
+#   API / Swagger   http://localhost:8080
+#   Mailpit         http://localhost:8025
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: automecanic
+
+resources:
+  - ../../base
+  - postgres.yaml
+  - mailpit.yaml
+
+# Valores de DESENVOLVIMENTO, descartáveis: o cluster local não guarda nada que importe.
+# Em nuvem o Secret vem do CD, nunca daqui. Sem sufixo de hash para o nome ser estável.
+secretGenerator:
+  - name: automecanic-api
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - ConnectionStrings__PostgreSQL=Host=postgres;Port=5432;Database=automecanic;Username=automecanic;Password=automecanic-local
+      - Jwt__ChaveDeAssinatura=chave-apenas-para-o-cluster-local-nao-use-em-producao-32+
+      - Seed__SenhaDoAdministrador=Admin@AutoMecanic2026
+      - Smtp__Usuario=
+      - Smtp__Senha=
+  - name: postgres
+    options:
+      disableNameSuffixHash: true
+    literals:
+      - POSTGRES_PASSWORD=automecanic-local
+
+# Imagem construída localmente e carregada no kind (sem registro).
+images:
+  - name: automecanic-api
+    newName: automecanic-api
+    newTag: local
+
+patches:
+  # Configuração: e-mail vai para o Mailpit, e há dados de demonstração para explorar.
+  - target:
+      kind: ConfigMap
+      name: automecanic-api
+    patch: |-
+      - op: replace
+        path: /data/Smtp__Host
+        value: mailpit
+      - op: replace
+        path: /data/Smtp__Porta
+        value: "1025"
+      - op: replace
+        path: /data/Smtp__Seguranca
+        value: Nenhuma
+      - op: replace
+        path: /data/Notificacoes__UrlPublicaDaApi
+        value: http://localhost:8080
+      - op: replace
+        path: /data/Seed__IncluirDadosDeDemonstracao
+        value: "true"
+
+  # No kind o tráfego entra por uma porta de nó (mapeada para 8080 em kind-config.yaml).
+  - target:
+      kind: Service
+      name: automecanic-api
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: NodePort
+      - op: add
+        path: /spec/ports/0/nodePort
+        value: 30080
+
+  # A imagem é local: nunca tentar baixar de um registro.
+  - target:
+      kind: Deployment
+      name: automecanic-api
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+  - target:
+      kind: Job
+      name: automecanic-migracao
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      # O PostgreSQL sobe junto com o Job; esperar por ele evita gastar as tentativas do Job.
+      - op: add
+        path: /spec/template/spec/initContainers
+        value:
+          - name: aguardar-banco
+            image: postgres:17-alpine
+            # -U é obrigatório: o UID do pod (1654) não existe nesta imagem, e sem usuário
+            # explícito o pg_isready desiste sem tentar conectar ("no attempt").
+            command: ["sh", "-c", "until pg_isready -h postgres -p 5432 -U automecanic; do sleep 2; done"]
+            securityContext:
+              allowPrivilegeEscalation: false
+              capabilities:
+                drop: ["ALL"]
+  - target:
+      kind: CronJob
+      name: automecanic-expiracao
+    patch: |-
+      - op: replace
+        path: /spec/jobTemplate/spec/template/spec/containers/0/imagePullPolicy
+        value: Never

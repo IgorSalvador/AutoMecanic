@@ -19,3 +19,6 @@ Dockerfile text eol=lf
 *.jpg binary
 *.pdf binary
 *.ico binary
+
+# Scripts de shell precisam de LF mesmo em checkouts no Windows.
+*.sh      text eol=lf
