@@ -15,6 +15,7 @@ using AutoMecanic.Infrastructure.Persistencia;
 using AutoMecanic.Infrastructure.Persistencia.Seed;
 using AutoMecanic.Infrastructure.Seguranca;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
@@ -34,6 +35,28 @@ var builder = WebApplication.CreateBuilder(argumentosDoHost);
 // O Kestrel escreve o cabeçalho "Server: Kestrel" no momento do flush, depois de qualquer
 // middleware. Desligá-lo na origem é a única forma de a resposta não anunciar o servidor.
 builder.WebHost.ConfigureKestrel(opcoes => opcoes.AddServerHeader = false);
+
+// Tempo que o host espera, ao receber SIGTERM, para as requisições e o worker da caixa de saída
+// terminarem. Deve ficar abaixo do terminationGracePeriodSeconds do pod.
+builder.Services.Configure<HostOptions>(opcoes =>
+    opcoes.ShutdownTimeout = TimeSpan.FromSeconds(builder.Configuration.GetValue("Hospedagem:TempoDeEncerramentoEmSegundos", 30)));
+
+// Atrás de um load balancer, o IP e o esquema reais do cliente chegam em X-Forwarded-*. Sem
+// isto, o limite de taxa por IP enxergaria só o IP do balanceador. Desligado por padrão:
+// aceitar o cabeçalho de quem fala direto com a API permitiria forjar o IP.
+var usarCabecalhosEncaminhados = builder.Configuration.GetValue("Hospedagem:UsarCabecalhosEncaminhados", false);
+if (usarCabecalhosEncaminhados)
+{
+    builder.Services.Configure<ForwardedHeadersOptions>(opcoes =>
+    {
+        opcoes.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
+        // O balanceador tem IP variável dentro da rede do cluster; por isso as listas de
+        // confiança padrão (apenas loopback) são limpas. O pod só é alcançável por ele.
+        opcoes.KnownIPNetworks.Clear();
+        opcoes.KnownProxies.Clear();
+    });
+}
 
 // ---------------------------------------------------------------------------
 // Registro estruturado. Console em JSON facilita a coleta por agregadores de log
@@ -312,6 +335,13 @@ if (modo != ModoDeExecucao.Servidor)
 // Pipeline
 // ---------------------------------------------------------------------------
 
+// Primeiro do pipeline: log, limite de taxa e redirecionamento HTTPS dependem do IP e do
+// esquema originais da requisição.
+if (usarCabecalhosEncaminhados)
+{
+    app.UseForwardedHeaders();
+}
+
 // O log de requisições vem por fora do tratamento de exceções, e não por dentro: assim
 // ele observa o status final da resposta (401, 404, 422) em vez do estado anterior à
 // conversão, que faria toda falha de negócio aparecer como erro 500 no log.
@@ -330,17 +360,27 @@ if (!app.Environment.IsDevelopment())
 {
     // HSTS instrui o navegador a nunca mais acessar este host por HTTP.
     app.UseHsts();
-    app.UseHttpsRedirection();
+
+    // No Kubernetes o TLS termina no load balancer e o pod só fala HTTP; o redirecionamento
+    // precisa poder ser desligado (Hospedagem__RedirecionarParaHttps=false).
+    if (app.Configuration.GetValue("Hospedagem:RedirecionarParaHttps", true))
+    {
+        app.UseHttpsRedirection();
+    }
 }
 
-app.UseSwagger(opcoes => opcoes.RouteTemplate = "swagger/{documentName}/swagger.json");
-app.UseSwaggerUI(opcoes =>
+var swaggerHabilitado = app.Configuration.GetValue("Swagger:Habilitado", true);
+if (swaggerHabilitado)
 {
-    opcoes.SwaggerEndpoint("/swagger/v1/swagger.json", "AutoMecanic API v1");
-    opcoes.DocumentTitle = "AutoMecanic — Documentação da API";
-    opcoes.DisplayRequestDuration();
-    opcoes.EnableTryItOutByDefault();
-});
+    app.UseSwagger(opcoes => opcoes.RouteTemplate = "swagger/{documentName}/swagger.json");
+    app.UseSwaggerUI(opcoes =>
+    {
+        opcoes.SwaggerEndpoint("/swagger/v1/swagger.json", "AutoMecanic API v1");
+        opcoes.DocumentTitle = "AutoMecanic — Documentação da API";
+        opcoes.DisplayRequestDuration();
+        opcoes.EnableTryItOutByDefault();
+    });
+}
 
 app.UseCors(PoliticaDeCors);
 app.UseRateLimiter();
@@ -363,7 +403,10 @@ app.MapHealthChecks("/health/pronto", new Microsoft.AspNetCore.Diagnostics.Healt
 });
 
 // Raiz redireciona para a documentação: é o que uma pessoa espera ao abrir a URL.
-app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+if (swaggerHabilitado)
+{
+    app.MapGet("/", () => Results.Redirect("/swagger")).ExcludeFromDescription();
+}
 
 // ---------------------------------------------------------------------------
 // Preparação do banco na inicialização

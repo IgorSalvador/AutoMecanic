@@ -77,7 +77,7 @@ do dia a dia é no kind, e um *workflow* agendado destrói o cluster toda madrug
 | **A9** | **Outbox e e-mail:** tabela `mensagem_saida`; handler grava a mensagem na transação da mudança de status; porta `IEnviadorDeEmail` com adaptador MailKit; `BackgroundService` com `FOR UPDATE SKIP LOCKED`, novas tentativas com intervalo crescente e limite de tentativas; templates da equipe para OS aberta, orçamento enviado (com número e instruções de aprovação), em execução, finalizada, entregue e cancelada | E-mail chega no Mailpit; teste de integração com Mailpit via Testcontainers. **Ponto de reavaliação:** trocar a outbox por envio simples só muda o despachante | G | A1 | ✅ |
 | **A10** | **Migração fora da inicialização:** modo `--migrar` no binário (mesmo padrão do `--health-check`), que migra, faz o seed e encerra; `MigrarNaInicializacao=false` no K8s | Job do K8s migra; a API não migra | P | — | ✅ |
 | **A11** | **Expiração como CronJob:** modo `--expirar-orcamentos` no binário | Teste do caso de uso | P | A10 | ✅ |
-| **A12** | **Ajustes para escalar:** `ForwardedHeaders` atrás do load balancer; Swagger e redirecionamento HTTPS configuráveis; encerramento gracioso do *worker*; `Version` do `Directory.Build.props` em `2.0.0` na entrega | Limites ajustáveis pelo ConfigMap | P | A9 | ⬜ |
+| **A12** | **Ajustes para escalar:** `ForwardedHeaders` atrás do load balancer; Swagger e redirecionamento HTTPS configuráveis; encerramento gracioso do *worker*; `Version` do `Directory.Build.props` em `2.0.0` na entrega | Limites ajustáveis pelo ConfigMap | P | A9 | ✅ |
 
 > **Migrações do EF:** A8 e A9 geram migrações, que conflitam no `ModelSnapshot` se feitas em
 > paralelo. Regra: uma migração por PR, sempre regerada depois do *rebase*.
@@ -88,8 +88,8 @@ do dia a dia é no kind, e um *workflow* agendado destrói o cluster toda madrug
 
 | ID | Tarefa | Tam. | Depende | Situação |
 |---|---|:-:|---|:-:|
-| B1 | Dockerfile: copiar o novo projeto de testes no estágio de restore; labels OCI (`source`, `revision`, `version`) | P | A4 | ⬜ |
-| B2 | docker-compose: serviço Mailpit (interface na porta 8025); variáveis `SMTP_*` no `.env.example` | P | A9 | ⬜ |
+| B1 | Dockerfile: copiar o novo projeto de testes no estágio de restore; labels OCI (`source`, `revision`, `version`) | P | A4 | ✅ |
+| B2 | docker-compose: serviço Mailpit (interface na porta 8025); variáveis `SMTP_*` no `.env.example` | P | A9 | ✅ |
 
 ---
 
