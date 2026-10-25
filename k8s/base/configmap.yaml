@@ -1,0 +1,40 @@
+# Configuração sem segredo. Os nomes seguem a convenção do .NET: "__" separa os níveis da
+# seção (Smtp__Host = Smtp:Host). Os valores sensíveis ficam no Secret "automecanic-api".
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: automecanic-api
+data:
+  ASPNETCORE_ENVIRONMENT: Production
+  ASPNETCORE_HTTP_PORTS: "8080"
+  TZ: America/Sao_Paulo
+
+  # A imagem liga o GC de servidor; com limite de 512Mi o GC de estação usa bem menos memória.
+  DOTNET_gcServer: "0"
+
+  Jwt__Emissor: AutoMecanic.Api
+  Jwt__Audiencia: AutoMecanic.Clientes
+  Jwt__ValidadeEmMinutos: "60"
+
+  # Quem migra é o Job; as réplicas do Deployment não tocam no esquema ao subir.
+  BancoDeDados__MigrarNaInicializacao: "false"
+  BancoDeDados__SemearDados: "true"
+  Seed__IncluirDadosDeDemonstracao: "false"
+
+  # Atrás do load balancer: IP e esquema reais vêm em X-Forwarded-*, e o TLS termina nele.
+  Hospedagem__UsarCabecalhosEncaminhados: "true"
+  Hospedagem__RedirecionarParaHttps: "false"
+  Hospedagem__TempoDeEncerramentoEmSegundos: "25"
+  Swagger__Habilitado: "true"
+
+  LimiteDeTaxa__LoginPorMinuto: "10"
+  LimiteDeTaxa__GlobalPorMinuto: "300"
+  LimiteDeTaxa__ClientePorMinuto: "30"
+
+  Notificacoes__Habilitadas: "true"
+  # Endereço público (usado nas instruções de aprovação do e-mail); cada overlay define o seu.
+  Notificacoes__UrlPublicaDaApi: http://localhost:8080
+  Smtp__Host: smtp.gmail.com
+  Smtp__Porta: "587"
+  Smtp__Seguranca: StartTls
+  Smtp__Remetente: oficina@automecanic.local

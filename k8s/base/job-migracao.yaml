@@ -1,0 +1,55 @@
+# Aplica as migrações e a carga inicial, e encerra. O CD o recria a cada deploy e espera a
+# conclusão ANTES de atualizar o Deployment. O template de um Job é imutável, então o fluxo
+# é: kubectl delete job automecanic-migracao -> kubectl apply -k.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: automecanic-migracao
+  labels:
+    app.kubernetes.io/name: automecanic-migracao
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: automecanic-migracao
+    spec:
+      restartPolicy: Never
+      serviceAccountName: automecanic-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1654
+        runAsGroup: 1654
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrar
+          image: automecanic-api
+          imagePullPolicy: IfNotPresent
+          args: ["--migrar"]
+          envFrom:
+            - configMapRef:
+                name: automecanic-api
+            - secretRef:
+                name: automecanic-api
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

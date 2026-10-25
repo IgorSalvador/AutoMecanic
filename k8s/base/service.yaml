@@ -1,0 +1,15 @@
+# ClusterIP no base: o overlay da AWS troca o tipo por LoadBalancer.
+apiVersion: v1
+kind: Service
+metadata:
+  name: automecanic-api
+  labels:
+    app.kubernetes.io/name: automecanic-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: automecanic-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
