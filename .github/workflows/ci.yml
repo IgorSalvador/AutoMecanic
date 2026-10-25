@@ -243,6 +243,12 @@ jobs:
             --reporters cli \
             --color off
 
+          npx --yes newman run postman/AutoMecanic.postman_collection.json \
+            --folder "00 · Fase 2 — abertura completa, resposta do cliente e fila" \
+            --env-var "senhaAdmin=$SENHA" \
+            --reporters cli \
+            --color off
+
       # A parte de referência da coleção é derivada do OpenAPI. Se ela estiver
       # desatualizada, o arquivo regerado difere do versionado — e o aviso aparece
       # aqui, sem reprovar o pipeline por uma diferença cosmética de data.

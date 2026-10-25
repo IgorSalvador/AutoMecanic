@@ -237,8 +237,9 @@ public async Task<int> SalvarAlteracoesAsync(CancellationToken ct = default)
 ```
 
 **Custo.** Manipuladores lentos ou que chamem serviços externos seguram a transação. Por isso
-o único manipulador que grava dados é o do razão de estoque; o de alerta apenas registra em
-log. Notificação por e-mail ou fila, quando existir, migrará para depois do commit.
+os manipuladores só gravam dados no próprio banco — o do razão de estoque e, na Fase 2, o que
+grava a mensagem de e-mail na caixa de saída (ADR-10) — e o de alerta apenas registra em log.
+O envio do e-mail em si **não** acontece aqui: ele sai depois do commit, por outro processo.
 
 Um laço com limite de 10 rodadas trata a cascata (um evento gerando outro) e impede que um
 ciclo entre manipuladores trave a requisição.
@@ -286,6 +287,9 @@ estoque indefinidamente — daí a validade do orçamento e a rotina de expiraç
 ---
 
 ### ADR-07 · Migração automática na inicialização
+
+> **Revisado na Fase 2.** Em Kubernetes a migração passou a ser um Job (ADR-11). A decisão
+> abaixo continua valendo para o `docker compose`, que tem uma única instância.
 
 **Contexto.** As migrações podem ser aplicadas pela aplicação ou por um passo de implantação.
 
@@ -336,6 +340,137 @@ própria senha.
 **Como foi descoberto.** Por um teste de integração que autentica como atendente e tenta trocar
 a senha — não por leitura de código. É o tipo de defeito que só aparece quando o teste percorre
 o pipeline de autorização de verdade.
+
+---
+
+### ADR-10 · E-mail ao cliente por caixa de saída (*outbox*) transacional
+
+**Contexto.** A cada mudança de situação da OS o cliente recebe um e-mail. Enviar dentro da
+requisição acopla a resposta ao servidor SMTP: se ele estiver lento ou fora, a oficina não
+consegue abrir uma OS. Enviar depois do commit, direto do manipulador, perde a mensagem se o
+processo cair entre o commit e o envio — ou envia um e-mail de algo que depois foi desfeito.
+
+**Decisão.** O manipulador do evento de domínio grava uma `MensagemDeSaida` na **mesma
+transação** da mudança de status (aproveitando o despacho antes do commit do ADR-04). Um
+`BackgroundService` lê a tabela e envia por SMTP, com `FOR UPDATE SKIP LOCKED`, novas
+tentativas com intervalo crescente e limite de tentativas.
+
+**Por quê.** O e-mail sai **se, e somente se,** a mudança foi confirmada. `SKIP LOCKED` deixa
+várias réplicas dividirem a fila sem enviar a mesma mensagem duas vezes. A porta
+`IEnviadorDeEmail` isola o MailKit: trocar a caixa de saída por envio direto mudaria só o
+despachante, sem tocar nos casos de uso.
+
+**Custo.** Uma tabela e um processo a mais, e a entrega é *pelo menos uma vez* — uma falha entre
+o envio e a marcação da mensagem pode repetir o e-mail. É preferível a perdê-lo. O envio fica
+desligado por padrão (`Notificacoes:Habilitadas`) e, quando ligado, a configuração SMTP é
+validada na subida: um servidor mal configurado impede o início, em vez de acumular falhas.
+
+---
+
+### ADR-11 · Migração do banco como Job do Kubernetes
+
+**Contexto.** O ADR-07 deixou registrado o limite: com várias réplicas sob o HPA, duas
+instâncias tentariam alterar o esquema ao mesmo tempo.
+
+**Decisão.** O binário ganhou dois modos de tarefa avulsa, no mesmo padrão do `--health-check`:
+`--migrar` (migra, semeia e encerra) e `--expirar-orcamentos`. No Kubernetes o Deployment roda
+com `BancoDeDados__MigrarNaInicializacao=false`; a migração é um **Job** executado antes de
+cada atualização, e a expiração de orçamentos é um **CronJob**.
+
+**Por quê.** Uma única imagem atende os três papéis, e o código de saída (0 ou 1) é o que o
+orquestrador lê para tentar de novo. O CronJob executa uma vez por agendamento, sem um
+temporizador dentro de cada réplica disputando as mesmas OS. No `docker compose` nada muda.
+
+**Custo.** O template de um Job é imutável: o fluxo de deploy precisa apagar o Job anterior
+antes de reaplicar os manifestos. A ordem importa — migrar, esperar a conclusão e só então
+atualizar a API (o CD faz nessa sequência).
+
+---
+
+### ADR-12 · Manifestos em Kustomize, com um *base* e um overlay por ambiente
+
+**Contexto.** O mesmo conjunto de recursos precisa rodar num cluster local (kind) e na AWS
+(EKS), mudando só o que é do ambiente.
+
+**Decisão.** `k8s/base` com tudo que é comum — Namespace, ConfigMap, Deployment, Service, HPA,
+PodDisruptionBudget, Job e CronJob — e `k8s/overlays/local` (e, adiante, `aws`) com o que varia:
+imagem, endereço do banco, SMTP, tipo do Service e o Secret.
+
+**Por quê.** Kustomize vem embutido no `kubectl`, não exige instalar nada e evita o
+*template* de texto do Helm: o que se aplica é YAML válido, que o `kubeconform` consegue
+validar. Para um único serviço, a parametrização do Helm seria cerimônia.
+
+O Deployment segue a linha de segurança da imagem: `runAsNonRoot` com UID numérico, sem
+escalonamento de privilégio, todas as *capabilities* removidas, sistema de arquivos somente
+leitura e perfil `seccomp` padrão. O HPA usa 70% de CPU e 80% de memória, entre 2 e 6 réplicas,
+com janela de redução curta para a demonstração caber no vídeo.
+
+**Custo — descoberto no teste.** O HPA calcula sobre os *requests*. Com 192 Mi de memória
+pedida, o .NET retinha ~130 Mi por pod depois de um pico (67%) e o HPA nunca voltava às 2
+réplicas, porque com 2 pods passaria dos 80%. O request foi para 256 Mi.
+
+O Secret **não** é versionado: `base/secret.modelo.yaml` só documenta as chaves, e o valor
+vem do overlay local (descartável) ou do pipeline de CD.
+
+---
+
+### ADR-13 · SMTP genérico, com Mailpit em desenvolvimento
+
+**Contexto.** Era preciso um provedor de e-mail para a demonstração, sem custo e sem depender
+de uma conta empresarial.
+
+**Decisão.** Cliente SMTP genérico (MailKit), configurado por `Smtp__*`. Em produção, uma
+conta Gmail com **senha de app** guardada num Secret; em desenvolvimento, o Mailpit, que recebe
+tudo e não entrega nada.
+
+**Por quê.** Qualquer provedor SMTP serve sem alterar código, e o Mailpit permite ver o e-mail
+exato que o cliente receberia, sem risco de enviar mensagem de teste a alguém. As credenciais
+nunca vão para o repositório.
+
+**Custo.** O Gmail limita o volume de envio e não é um serviço transacional. Adequado para a
+demonstração; um serviço como o Amazon SES seria a troca natural em produção, e como o envio
+está atrás de `IEnviadorDeEmail` ela afetaria só o adaptador.
+
+---
+
+### ADR-14 · Aprovação do orçamento pelo cliente em rota simples, sem webhook
+
+**Contexto.** O cliente precisa aprovar ou recusar o orçamento que recebeu por e-mail.
+
+**Decisão.** Duas rotas anônimas, `POST /acompanhamento/orcamento/aprovar` e `/reprovar`,
+identificadas pelo número da OS (que vai no e-mail) mais o CPF/CNPJ do titular. Não há *link*
+mágico nem webhook.
+
+**Por quê.** Reaproveita o desenho da consulta pública de acompanhamento: o documento é o segredo
+e a rota tem limite de taxa próprio. Dados que não conferem devolvem a mesma resposta de uma OS
+inexistente, para não permitir percorrer números de OS. Responder duas vezes é `422` e não
+altera nada; a recusa devolve as reservas de peça ao estoque.
+
+**Custo.** Quem souber o número e o CPF de alguém pode responder por ele. É o mesmo nível de
+confiança da consulta de acompanhamento e é o que o enunciado pede; um token assinado, de uso
+único e com validade, seria o próximo passo se o risco crescesse.
+
+---
+
+### ADR-15 · Nuvem: EKS, RDS e ECR, com Terraform em camadas *(decidido; em implementação)*
+
+**Contexto.** O ambiente de entrega é a AWS, com créditos limitados.
+
+**Decisão.** EKS para o cluster, RDS PostgreSQL 17 (`db.t4g.micro`, subnet privada) para o
+banco e ECR para as imagens. O Terraform fica em três camadas: `00-bootstrap` (estado remoto no
+S3), `10-base` (rede, ECR, RDS, papel OIDC do CI) e `20-cluster` (EKS e nós), esta última
+**criada e destruída sob demanda**. A autenticação do CI é por **OIDC**, sem chave de acesso de
+longa duração, com um papel restrito à `main` deste repositório.
+
+**Por quê.** O plano de controle do EKS e os nós respondem pela maior parte do custo (~US$ 0,25
+por hora no total, ~185 por mês ligado direto), então separar a camada do cluster permite
+destruí-la toda madrugada e manter o banco e a rede. Sem NAT Gateway (nós em subnet pública) se
+economizam ~US$ 33 por mês. O OIDC elimina o segredo mais perigoso do pipeline: não há chave
+da AWS para vazar.
+
+**Custo.** Nós em subnet pública ficam mais expostos, o que se compensa com *security groups*
+restritos. O cluster só existe enquanto alguém usa, então a demonstração exige criá-lo (~15
+minutos) antes de mostrar qualquer coisa.
 
 ---
 
@@ -424,12 +559,15 @@ AutoMecanic/
 │   │   │   ├── Repositorios/
 │   │   │   ├── Migracoes/                geradas pelo EF Core
 │   │   │   └── Seed/
+│   │   ├── Notificacoes/                 caixa de saída, SMTP (MailKit), worker
 │   │   ├── Seguranca/                    BCrypt, JWT
 │   │   └── Servicos/                     relógio
 │   └── AutoMecanic.Api/               📡 controladores, middlewares, Swagger
 ├── tests/
-│   ├── AutoMecanic.UnitTests/            439 verificações, ~3 s, sem I/O
-│   └── AutoMecanic.IntegrationTests/     47 verificações, API + PostgreSQL reais
+│   ├── AutoMecanic.UnitTests/            475 verificações, ~3 s, sem I/O
+│   ├── AutoMecanic.ArchitectureTests/    22 verificações das regras de dependência
+│   └── AutoMecanic.IntegrationTests/     101 verificações, API + PostgreSQL reais
+├── k8s/                                  manifestos Kustomize (base e overlays)
 ├── docs/                                 esta documentação
 ├── Dockerfile · docker-compose.yml
 └── Directory.Build.props · Directory.Packages.props

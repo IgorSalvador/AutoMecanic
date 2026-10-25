@@ -522,3 +522,90 @@ GET {{host}}/health/vivo
 ### 16.2 · Token forjado → 401
 GET {{api}}/clientes
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIn0.assinatura-invalida
+
+
+### ────────────────────────────────────────────────────────────────────────────
+### 17 · Fase 2 — abertura completa, resposta do cliente e fila
+###
+### Usa o serviço e a peça obtidos na seção 3. Os e-mails de cada mudança de situação
+### chegam ao Mailpit, em http://localhost:8025.
+### ────────────────────────────────────────────────────────────────────────────
+
+### 17.1 · Recepção completa: cliente, veículo, serviços e peças em uma transação
+# Sem saldo para alguma peça, nada é gravado, nem o número da OS.
+# @name recepcaoCompleta
+POST {{api}}/ordens-servico/recepcao
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "documentoCliente": "529.982.247-25",
+  "nomeCliente": "Marina Souza",
+  "emailCliente": "marina.souza@exemplo.com.br",
+  "telefoneCliente": "(11) 98765-4321",
+  "placa": "QWE4R56",
+  "marca": "Honda",
+  "modelo": "Civic EXL 2.0",
+  "anoFabricacao": 2020,
+  "anoModelo": 2020,
+  "cor": "Preto",
+  "descricaoProblema": "Luz da injeção acesa e marcha lenta irregular.",
+  "quilometragemEntrada": 58000,
+  "servicos": [{ "servicoId": "{{servicoId}}", "quantidade": 1 }],
+  "pecas": [{ "pecaId": "{{pecaId}}", "quantidade": 2 }]
+}
+
+@osIdF2 = {{recepcaoCompleta.response.body.$.id}}
+@osNumeroF2 = {{recepcaoCompleta.response.body.$.numero}}
+
+### 17.2 · Consulta de status (autenticada, payload leve)
+GET {{api}}/ordens-servico/{{osIdF2}}/status
+Authorization: Bearer {{token}}
+
+### 17.3 · Diagnóstico, orçamento e envio ao cliente
+POST {{api}}/ordens-servico/{{osIdF2}}/diagnostico/iniciar
+Authorization: Bearer {{token}}
+
+###
+POST {{api}}/ordens-servico/{{osIdF2}}/orcamento
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "percentualDesconto": 0 }
+
+###
+POST {{api}}/ordens-servico/{{osIdF2}}/orcamento/enviar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{ "validadeEmDias": 7 }
+
+### 17.4 · O cliente aprova pela rota pública (sem token)
+# Identificado pelo número da OS (enviado por e-mail) e pelo CPF.
+POST {{api}}/acompanhamento/orcamento/aprovar
+Content-Type: application/json
+
+{ "numero": "{{osNumeroF2}}", "documento": "52998224725" }
+
+### 17.5 · Aprovar de novo → 422
+POST {{api}}/acompanhamento/orcamento/aprovar
+Content-Type: application/json
+
+{ "numero": "{{osNumeroF2}}", "documento": "52998224725" }
+
+### 17.6 · Fila de trabalho priorizada
+# Em execução > Aguardando aprovação > Em diagnóstico > Recebida; mais antigas primeiro.
+# Finalizadas, entregues e canceladas ficam de fora.
+GET {{api}}/ordens-servico?tamanhoPagina=100
+Authorization: Bearer {{token}}
+
+### 17.7 · Histórico: inclui as encerradas
+GET {{api}}/ordens-servico?incluirEncerradas=true&tamanhoPagina=100
+Authorization: Bearer {{token}}
+
+### 17.8 · Alternativa: o cliente recusa o orçamento (devolve as reservas)
+# Use numa OS que esteja Aguardando aprovação.
+POST {{api}}/acompanhamento/orcamento/reprovar
+Content-Type: application/json
+
+{ "numero": "{{osNumeroF2}}", "documento": "52998224725", "motivo": "Valor acima do esperado." }

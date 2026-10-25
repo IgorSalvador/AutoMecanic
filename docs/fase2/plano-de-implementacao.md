@@ -177,8 +177,8 @@ Passos do `cd.yml`:
 | ID | Tarefa | Tam. | Depende | Situação |
 |---|---|:-:|---|:-:|
 | F1 | README reescrito: objetivos da fase; diagramas Mermaid de componentes, infraestrutura AWS e fluxo de deploy; instruções de execução local, em Kubernetes e com Terraform; links da collection e do vídeo | M | E2 | ⬜ |
-| F2 | `docs/05-arquitetura.md`: novos ADRs (EKS, outbox, migração como Job, Kustomize, Gmail SMTP, OIDC) | P | — | ⬜ |
-| F3 | Collection Postman regerada, com pasta do fluxo da Fase 2 (abertura completa → aprovação pelo cliente → listagem) | P | A5–A8 | ⬜ |
+| F2 | `docs/05-arquitetura.md`: novos ADRs (EKS, outbox, migração como Job, Kustomize, Gmail SMTP, OIDC) | P | — | ✅ |
+| F3 | Collection Postman regerada, com pasta do fluxo da Fase 2 (abertura completa → aprovação pelo cliente → listagem) | P | A5–A8 | ✅ |
 | F4 | Relatório de segurança atualizado: rota pública de aprovação, segredo SMTP, nuvem | P | E2 | ⬜ |
 | F5 | Roteiro do vídeo (até 15 min): deploy, CI/CD, APIs e autoescala | P | C4, E2 | ⬜ |
 | F6 | `ENTREGA.md`, PDF do portal e tag `v2.0.0` | P | F1 | ⬜ |
