@@ -1,5 +1,9 @@
 # 00-bootstrap — bucket do estado do Terraform
 
+> **Primeira vez na AWS?** Siga antes o [guia AWS do zero](../../docs/08-guia-aws-do-zero.md):
+> ele cobre conta, MFA, alarmes de custo, usuários, instalação das ferramentas e credenciais, e
+> termina neste passo.
+
 Cria **uma única vez** o bucket S3 onde as camadas `10-base` e `20-cluster` guardam o estado.
 Sem ele, cada pessoa teria um estado local diferente e o Terraform não saberia o que já existe.
 
