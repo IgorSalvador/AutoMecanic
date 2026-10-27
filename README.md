@@ -196,6 +196,7 @@ peças são baixadas. Documento que não confere recebe a mesma resposta de OS i
 | [Arquitetura](docs/05-arquitetura.md) | Camadas e as decisões técnicas, com seus custos |
 | [Relatório de segurança](docs/06-relatorio-de-seguranca.md) | Análise de vulnerabilidades e OWASP API Top 10 |
 | [Guia de testes](docs/07-guia-de-testes.md) | Como testar tudo: testes automatizados, compose, Kubernetes local, HPA e roteiro da AWS |
+| [AWS do zero](docs/08-guia-aws-do-zero.md) | Passo a passo para quem nunca usou nuvem: conta, MFA, alarmes de custo, usuários, CLI e Terraform |
 | [Documento de entrega](docs/ENTREGA.md) | Modelo para exportação em PDF |
 | [Coleção Postman](postman/README.md) | Como importar, executar e regerar a coleção |
 
