@@ -152,7 +152,7 @@ Detalhes do `10-base/`:
 
 | ID | Tarefa | Tam. | Depende | Situação |
 |---|---|:-:|---|:-:|
-| **E1** | **`ci.yml` ampliado:** validação dos manifestos (kubeconform); `terraform fmt` e `validate` nos PRs | P | C1, D2 | ⬜ |
+| **E1** | **`ci.yml` ampliado:** validação dos manifestos (kubeconform); `terraform fmt` e `validate` nos PRs | P | C1, D2 | ✅ |
 | **E2** | **`cd.yml`** (push na `main` ou disparo manual; *environment* `aws` protegido por aprovação), com os passos abaixo | G | A10, C3, D3 | ⬜ |
 | **E3** | **`destruir-cluster.yml`:** disparo manual **e agendado toda madrugada**; destrói só a camada `20-cluster` | P | D3 | ⬜ |
 

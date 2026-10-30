@@ -88,6 +88,92 @@ jobs:
             TestResults/**/*.trx
             coverage/
 
+  # Os manifestos do Kubernetes são renderizados com o Kustomize e validados contra o esquema da
+  # API do Kubernetes. Erro de campo, de indentação ou de versão aparece aqui, e não no meio de
+  # um deploy na AWS (que custa dinheiro por hora).
+  manifestos:
+    name: Manifestos Kubernetes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      KUBECONFORM_VERSAO: v0.7.0
+      # Versão do Kubernetes contra a qual os manifestos são validados (a do cluster EKS).
+      KUBERNETES_VERSAO: 1.36.0
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar o kubeconform
+        run: |
+          curl -sSfL "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSAO}/kubeconform-linux-amd64.tar.gz" \
+            | tar -xz -C /usr/local/bin kubeconform
+          kubeconform -v
+
+      - name: Validar cada kustomization
+        run: |
+          falhou=0
+          for dir in k8s/base k8s/overlays/local k8s/overlays/local/carga k8s/overlays/aws; do
+            echo "::group::$dir"
+            if kubectl kustomize "$dir" | kubeconform -strict -summary -kubernetes-version "$KUBERNETES_VERSAO" -; then
+              echo "OK: $dir"
+            else
+              echo "::error::Manifestos inválidos em $dir"
+              falhou=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $falhou
+
+      # O overlay da AWS depende de um script que troca a imagem e monta o Secret. O modo de
+      # simulação percorre esse caminho sem cluster.
+      - name: Conferir o script de deploy da AWS (simulação)
+        env:
+          IMAGEM: 123456789012.dkr.ecr.us-east-1.amazonaws.com/automecanic-api:ci
+          CADEIA_DE_CONEXAO: Host=exemplo;Port=5432;Database=automecanic;Username=automecanic;Password=exemplo
+          JWT_CHAVE: chave-de-simulacao-com-mais-de-trinta-e-dois-caracteres
+          SEED_SENHA_ADMIN: Simulacao@1234
+          SMTP_USUARIO: oficina@exemplo.com
+          SMTP_SENHA: exemplo
+          DRY_RUN: '1'
+        run: bash k8s/overlays/aws/aplicar.sh
+
+  # Formatação e validade do Terraform das três camadas. Não precisa de credenciais da AWS:
+  # nada é planejado nem aplicado aqui.
+  terraform:
+    name: Terraform (${{ matrix.camada }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        camada: [00-bootstrap, 10-base, 20-cluster]
+
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.camada }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.13.5
+
+      - name: Formatação
+        run: terraform fmt -check -diff -recursive
+
+      # -backend=false: não toca no bucket do estado. -lockfile=readonly: reprova se o
+      # .terraform.lock.hcl versionado não cobrir os provedores (evita "funciona na minha máquina").
+      - name: Inicializar
+        run: terraform init -backend=false -input=false -lockfile=readonly
+
+      - name: Validar
+        run: terraform validate
+
   seguranca:
     name: Análise de vulnerabilidades
     runs-on: ubuntu-latest
