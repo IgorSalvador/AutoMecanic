@@ -134,7 +134,7 @@ infra/
 |---|---|---|:-:|---|:-:|
 | **D1** | **`00-bootstrap/`:** bucket S3 do estado (versionado, criptografado, sem acesso público), trava nativa via `use_lockfile` (sem DynamoDB) | Estado remoto funcionando | P | — | 🟨 |
 | **D2** | **`10-base/`:** rede, ECR, RDS, papel OIDC do CI e Budgets como código (detalhes abaixo) | `apply` e `destroy` limpos | M | D1 | 🟨 |
-| **D3** | **`20-cluster/`:** EKS via `terraform-aws-modules/eks`; 2 nós t3.medium (Spot opcional); *access entries* para o papel do CI e os três integrantes; add-ons vpc-cni, coredns, kube-proxy e metrics-server | Cluster sobe em ~15 min e é destruído sem resíduo | M | D2 | ⬜ |
+| **D3** | **`20-cluster/`:** EKS via `terraform-aws-modules/eks`; 2 nós t3.medium (Spot opcional); *access entries* para o papel do CI e os três integrantes; add-ons vpc-cni, coredns, kube-proxy e metrics-server | Cluster sobe em ~15 min e é destruído sem resíduo | M | D2 | 🟨 |
 | **D4** | **`infra/README.md`:** recursos criados por camada, custo por hora, ordem para aplicar e destruir | — | P | D3 | ⬜ |
 
 Detalhes do `10-base/`:

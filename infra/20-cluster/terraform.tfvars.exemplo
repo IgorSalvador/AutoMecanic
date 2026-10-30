@@ -1,0 +1,10 @@
+# Copie para terraform.tfvars (que o .gitignore não deixa ir para o git) e ajuste.
+# Cada integrante: aws sts get-caller-identity --query Arn --output text
+administradores = [
+  "arn:aws:iam::123456789012:user/matheus",
+  "arn:aws:iam::123456789012:user/colega1",
+  "arn:aws:iam::123456789012:user/colega2",
+]
+
+# Nós Spot custam ~70% menos, mas podem ser retirados pela AWS com 2 minutos de aviso.
+# usar_spot = true
