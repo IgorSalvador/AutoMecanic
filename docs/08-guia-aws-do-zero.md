@@ -144,9 +144,13 @@ região selecionada**: se você "não encontrar" algo que criou, quase sempre é
 **Por quê.** É o seu cinto de segurança. Na nuvem, esquecer algo ligado gera cobrança; o alarme
 avisa por e-mail antes que vire problema. O plano do projeto usa **US$ 20, US$ 50 e US$ 100**.
 
-> **O que o Budgets mede.** Ele alerta sobre o **custo de uso**, e por padrão **não desconta os
-> créditos**. Então um alarme de US$ 20 dispara quando você **consumiu** US$ 20, mesmo que isso
-> saia do crédito e não do cartão. É exatamente o que queremos: saber o ritmo de consumo.
+> **O que o Budgets mede.** Queremos que o alarme dispare pelo **consumo**, mesmo que ele saia do
+> crédito e não do cartão: assim você sabe o ritmo de gasto. Para isso, o orçamento **não pode
+> descontar os créditos**; se descontar, o custo líquido fica em zero enquanto houver crédito e o
+> alarme nunca dispara. Ao criar o orçamento, abra **Cost types** (ou *Advanced settings*) e
+> confira que **Credits** (e Refunds) **estão desmarcados**. O modelo simplificado do console pode
+> ter um padrão diferente do esperado; na dúvida, confira. (O Terraform do D2 já cria os
+> orçamentos com os créditos desmarcados.)
 
 ### 5.1 Habilitar o acesso do IAM ao faturamento (uma vez)
 
