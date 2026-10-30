@@ -107,7 +107,7 @@ k8s/
 |---|---|---|:-:|---|:-:|
 | **C1** | **`base/`:** Namespace, ConfigMap, modelo de Secret (sem valores reais no git), Deployment, Service (ClusterIP), HPA, Job de migração e CronJob de expiração | `kubectl apply -k` válido | M | A10, A11 | ✅ |
 | **C2** | **`overlays/local/`:** PostgreSQL em StatefulSet com volume persistente, Mailpit, metrics-server e script para subir o cluster com kind | Fluxo completo local; HPA lendo métricas | M | C1 | ✅ |
-| **C3** | **`overlays/aws/`:** Service do tipo LoadBalancer (NLB), imagem do ECR, endpoint do RDS, SMTP do Gmail | Aplicado no EKS | P | C1, D3 | ⬜ |
+| **C3** | **`overlays/aws/`:** Service do tipo LoadBalancer (NLB), imagem do ECR, endpoint do RDS, SMTP do Gmail | Aplicado no EKS | P | C1, D3 | 🟨 |
 | **C4** | **Carga para o HPA:** script k6 executado como Job no cluster | `kubectl get hpa -w` mostra os pods subindo e descendo | P | C2 | ✅ |
 
 Detalhes do `base/`:

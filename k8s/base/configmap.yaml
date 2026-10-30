@@ -21,8 +21,10 @@ data:
   BancoDeDados__SemearDados: "true"
   Seed__IncluirDadosDeDemonstracao: "false"
 
-  # Atrás do load balancer: IP e esquema reais vêm em X-Forwarded-*, e o TLS termina nele.
-  Hospedagem__UsarCabecalhosEncaminhados: "true"
+  # Só ligue UsarCabecalhosEncaminhados atrás de um proxy de camada 7 (ALB, ingress) que defina
+  # X-Forwarded-*; sem ele, qualquer cliente forjaria o cabeçalho e escaparia do limite de taxa
+  # por IP. Um NLB não define. O pod só fala HTTP, então não há redirecionamento para HTTPS.
+  Hospedagem__UsarCabecalhosEncaminhados: "false"
   Hospedagem__RedirecionarParaHttps: "false"
   Hospedagem__TempoDeEncerramentoEmSegundos: "25"
   Swagger__Habilitado: "true"
