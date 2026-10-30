@@ -197,6 +197,7 @@ peças são baixadas. Documento que não confere recebe a mesma resposta de OS i
 | [Relatório de segurança](docs/06-relatorio-de-seguranca.md) | Análise de vulnerabilidades e OWASP API Top 10 |
 | [Guia de testes](docs/07-guia-de-testes.md) | Como testar tudo: testes automatizados, compose, Kubernetes local, HPA e roteiro da AWS |
 | [AWS do zero](docs/08-guia-aws-do-zero.md) | Passo a passo para quem nunca usou nuvem: conta, MFA, alarmes de custo, usuários, CLI e Terraform |
+| [Deploy na AWS (CI/CD)](docs/09-guia-cd-aws.md) | Configurar o GitHub e a AWS, rodar o deploy e, em cada etapa, como desligar para não gerar custo |
 | [Documento de entrega](docs/ENTREGA.md) | Modelo para exportação em PDF |
 | [Coleção Postman](postman/README.md) | Como importar, executar e regerar a coleção |
 

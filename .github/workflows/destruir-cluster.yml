@@ -1,0 +1,151 @@
+# Destrói o cluster EKS para parar de pagar por ele: toda madrugada (agendado) e quando alguém
+# quiser (disparo manual). Só apaga a camada 20-cluster; o banco e a rede (10-base) ficam.
+#
+# Este fluxo NÃO usa o environment "aws" de propósito: a aprovação manual faria a execução da
+# madrugada ficar parada esperando alguém, e o cluster continuaria cobrando.
+#
+# Passo a passo e como conferir que nada ficou cobrando: docs/09-guia-cd-aws.md.
+
+name: Destruir cluster
+
+on:
+  schedule:
+    # 06:00 UTC = 03:00 em Brasília. O agendamento só vale para a branch padrão (main).
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      destruir_base:
+        description: 'Destruir TAMBÉM a camada 10-base (rede, ECR e BANCO DE DADOS). Apaga os dados.'
+        type: boolean
+        default: false
+
+# Não destrói no meio de um deploy, nem faz dois destroys ao mesmo tempo.
+concurrency:
+  group: cd-aws
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSAO: 1.13.5
+
+jobs:
+  destruir:
+    name: Destruir o cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # login na AWS por OIDC
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Sem o papel configurado não há o que destruir (a AWS não foi ligada a este repositório).
+      # Pula sem falhar, para não gerar e-mail de erro toda madrugada.
+      - name: Conferir se a AWS está configurada
+        id: cfg
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+        run: |
+          if [[ -z "$AWS_ROLE_ARN" ]]; then
+            echo "::notice::O segredo AWS_ROLE_ARN não existe; nada a destruir."
+            echo "configurado=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configurado=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.cfg.outputs.configurado == 'true'
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.cfg.outputs.configurado == 'true'
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSAO }}
+          terraform_wrapper: false
+
+      - name: Ver o que existe agora
+        id: situacao
+        if: steps.cfg.outputs.configurado == 'true'
+        run: |
+          if aws eks describe-cluster --name automecanic >/dev/null 2>&1; then
+            echo "cluster=true" >> "$GITHUB_OUTPUT"
+            echo "O cluster 'automecanic' existe."
+          else
+            echo "cluster=false" >> "$GITHUB_OUTPUT"
+            echo "Não há cluster 'automecanic'."
+          fi
+
+      # O balanceador é criado pelo Kubernetes (ao aplicar o Service), não pelo Terraform. Se o
+      # cluster for destruído com ele de pé, ele fica órfão, continua cobrando e impede a
+      # exclusão da VPC. Por isso é removido ANTES, e o fluxo espera ele sumir.
+      - name: Remover a aplicação e o load balancer
+        if: steps.cfg.outputs.configurado == 'true' && steps.situacao.outputs.cluster == 'true'
+        run: |
+          aws eks update-kubeconfig --region "$AWS_REGION" --name automecanic
+          kubectl delete -k k8s/overlays/aws --ignore-not-found --timeout=300s || true
+          # Garantia: se o overlay não foi aplicado, apaga o Service direto.
+          kubectl -n automecanic delete service automecanic-api --ignore-not-found --timeout=300s || true
+
+      - name: Esperar o load balancer sumir
+        if: steps.cfg.outputs.configurado == 'true' && steps.situacao.outputs.cluster == 'true'
+        working-directory: infra/10-base
+        run: |
+          terraform init -input=false >/dev/null
+          VPC="$(terraform output -raw vpc_id)"
+
+          for tentativa in $(seq 1 40); do
+            v2="$(aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC'].LoadBalancerName" --output text)"
+            classico="$(aws elb describe-load-balancers --query "LoadBalancerDescriptions[?VPCId=='$VPC'].LoadBalancerName" --output text)"
+            if [[ -z "$v2" && -z "$classico" ]]; then
+              echo "Nenhum load balancer na VPC."
+              exit 0
+            fi
+            echo "Ainda existem balanceadores na VPC ($tentativa/40): $v2 $classico"
+            sleep 15
+          done
+          echo "::error::Um load balancer não sumiu a tempo. Apague-o no console (EC2 → Load Balancers) e rode de novo."
+          exit 1
+
+      - name: Terraform destroy — camada 20-cluster
+        if: steps.cfg.outputs.configurado == 'true'
+        working-directory: infra/20-cluster
+        env:
+          # O destroy também valida as variáveis; o valor em si não importa ao destruir.
+          ADMINISTRADORES: ${{ vars.ADMINISTRADORES }}
+        run: |
+          export TF_VAR_administradores="${ADMINISTRADORES:-[\"arn:aws:iam::000000000000:user/placeholder\"]}"
+          terraform init -input=false
+          terraform destroy -input=false -auto-approve
+
+      # Só por disparo manual e com a caixa marcada. Apaga o banco e os dados.
+      - name: Terraform destroy — camada 10-base (opcional)
+        if: steps.cfg.outputs.configurado == 'true' && github.event_name == 'workflow_dispatch' && inputs.destruir_base
+        working-directory: infra/10-base
+        env:
+          EMAILS_DE_ALERTA: ${{ vars.EMAILS_DE_ALERTA }}
+          CRIAR_ORCAMENTOS: ${{ vars.CRIAR_ORCAMENTOS }}
+        run: |
+          export TF_VAR_emails_de_alerta="${EMAILS_DE_ALERTA:-[]}"
+          export TF_VAR_criar_orcamentos="${CRIAR_ORCAMENTOS:-true}"
+          terraform init -input=false
+          terraform destroy -input=false -auto-approve
+
+      - name: Conferir o que sobrou cobrando
+        if: always() && steps.cfg.outputs.configurado == 'true'
+        run: |
+          {
+            echo "## Conferência pós-destruição"
+            echo
+            echo "| Recurso | Encontrado |"
+            echo "|---|---|"
+            echo "| Clusters EKS | $(aws eks list-clusters --query 'clusters' --output text) |"
+            echo "| Instâncias EC2 em execução | $(aws ec2 describe-instances --filters Name=instance-state-name,Values=running --query 'Reservations[].Instances[].InstanceId' --output text) |"
+            echo "| Load balancers (v2) | $(aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName' --output text) |"
+            echo "| Elastic IPs | $(aws ec2 describe-addresses --query 'Addresses[].PublicIp' --output text) |"
+            echo "| Instâncias RDS | $(aws rds describe-db-instances --query 'DBInstances[].DBInstanceIdentifier' --output text) |"
+            echo
+            echo "Células vazias significam que não há nada cobrando naquele item. O RDS só some se a camada 10-base foi destruída."
+          } >> "$GITHUB_STEP_SUMMARY"

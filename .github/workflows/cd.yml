@@ -1,0 +1,245 @@
+# Entrega contínua na AWS: testa, publica a imagem no ECR, aplica o Terraform, migra o banco,
+# atualiza o cluster e roda um teste de fumaça no endereço público.
+#
+# ⚠️ CUSTO. Este fluxo CRIA o cluster EKS (~US$ 0,25 por hora ligado). Por isso:
+#   · o deploy só roda se a variável do repositório CD_HABILITADO for "true" (ou por disparo manual);
+#   · o job de deploy usa o environment "aws", que deve exigir aprovação manual;
+#   · o workflow "Destruir cluster" apaga o cluster toda madrugada.
+# Pré-requisitos e passo a passo: docs/09-guia-cd-aws.md.
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+# Um deploy por vez: dois terraform apply simultâneos disputariam a trava do estado.
+concurrency:
+  group: cd-aws
+  cancel-in-progress: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  AWS_REGION: us-east-1
+  TERRAFORM_VERSAO: 1.13.5
+
+jobs:
+  testar:
+    name: Compilação e testes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    # Sem a variável ligada, o CD não faz nada (nem em push na main), exceto por disparo manual.
+    if: github.event_name == 'workflow_dispatch' || vars.CD_HABILITADO == 'true'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Testes
+        run: dotnet test --configuration Release --nologo
+
+  implantar:
+    name: Implantar na AWS
+    needs: testar
+    runs-on: ubuntu-latest
+    # A aprovação manual acontece aqui, uma vez por execução. Este nome precisa ser igual ao
+    # environment que o papel do CI aceita (variável github_ambiente da camada 10-base).
+    environment: aws
+    permissions:
+      contents: read
+      id-token: write # necessário para o login na AWS por OIDC
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Segredos e variáveis chegam por env (e não colados no script), para um valor com aspas
+      # ou cifrão não quebrar nem injetar comandos.
+      - name: Conferir a configuração
+        env:
+          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
+          JWT_CHAVE: ${{ secrets.JWT_CHAVE }}
+          SEED_SENHA_ADMIN: ${{ secrets.SEED_SENHA_ADMIN }}
+          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
+          # Valores que NÃO são segredo (e-mails e ARNs), em lista JSON. Precisam ser os MESMOS
+          # usados nos terraform apply feitos à mão, senão o CD altera esses recursos.
+          EMAILS_DE_ALERTA: ${{ vars.EMAILS_DE_ALERTA }}
+          ADMINISTRADORES: ${{ vars.ADMINISTRADORES }}
+          CRIAR_ORCAMENTOS: ${{ vars.CRIAR_ORCAMENTOS }}
+        run: |
+          criar_orcamentos="${CRIAR_ORCAMENTOS:-true}"
+          faltando=()
+          [[ -n "$AWS_ROLE_ARN" ]]     || faltando+=("secret AWS_ROLE_ARN")
+          [[ -n "$JWT_CHAVE" ]]        || faltando+=("secret JWT_CHAVE")
+          [[ -n "$SEED_SENHA_ADMIN" ]] || faltando+=("secret SEED_SENHA_ADMIN")
+          [[ -n "$SMTP_USUARIO" ]]     || faltando+=("secret SMTP_USUARIO")
+          [[ -n "$SMTP_SENHA" ]]       || faltando+=("secret SMTP_SENHA")
+          [[ -n "$ADMINISTRADORES" ]]  || faltando+=("variable ADMINISTRADORES")
+          if [[ "$criar_orcamentos" == "true" && -z "$EMAILS_DE_ALERTA" ]]; then
+            faltando+=("variable EMAILS_DE_ALERTA")
+          fi
+          if ((${#faltando[@]})); then
+            echo "::error::Faltam: ${faltando[*]}. Veja docs/09-guia-cd-aws.md."
+            exit 1
+          fi
+
+          # Variáveis do Terraform para os passos seguintes (lista vazia quando não houver e-mails).
+          {
+            echo "TF_VAR_emails_de_alerta=${EMAILS_DE_ALERTA:-[]}"
+            echo "TF_VAR_administradores=$ADMINISTRADORES"
+            echo "TF_VAR_criar_orcamentos=$criar_orcamentos"
+          } >> "$GITHUB_ENV"
+
+      # Sem chave de acesso: o GitHub emite um token de curta duração e a AWS o troca por
+      # credenciais temporárias do papel automecanic-ci.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSAO }}
+          terraform_wrapper: false # com o wrapper, "terraform output -raw" ganha linhas extras
+
+      # A camada 10-base (rede, ECR, RDS) precisa existir ANTES de publicar a imagem.
+      - name: Terraform — camada 10-base
+        working-directory: infra/10-base
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Publicar a imagem no ECR
+        id: imagem
+        run: |
+          REPO="$(terraform -chdir=infra/10-base output -raw ecr_repositorio_url)"
+          REGISTRO="${REPO%%/*}"
+          SHA="${GITHUB_SHA::7}"
+
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSAO="${GITHUB_REF_NAME#v}"
+          else
+            VERSAO="$(sed -n 's|.*<Version>\(.*\)</Version>.*|\1|p' Directory.Build.props)"
+          fi
+
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$REGISTRO"
+
+          docker build \
+            --build-arg VERSAO="$VERSAO" \
+            --build-arg REVISAO="$GITHUB_SHA" \
+            -t "$REPO:$SHA" .
+          docker push "$REPO:$SHA"
+
+          # Em releases (tag vX.Y.Z), a mesma imagem também recebe a tag da versão.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            docker tag "$REPO:$SHA" "$REPO:$GITHUB_REF_NAME"
+            docker push "$REPO:$GITHUB_REF_NAME"
+          fi
+
+          echo "imagem=$REPO:$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform — camada 20-cluster
+        working-directory: infra/20-cluster
+        run: |
+          terraform init -input=false
+          terraform apply -input=false -auto-approve
+
+      - name: Conectar ao cluster
+        run: |
+          aws eks update-kubeconfig --region "$AWS_REGION" \
+            --name "$(terraform -chdir=infra/20-cluster output -raw nome_do_cluster)"
+
+          # A permissão de acesso e os nós levam alguns instantes depois de o cluster nascer.
+          for tentativa in $(seq 1 30); do
+            if kubectl get nodes >/dev/null 2>&1; then break; fi
+            echo "Aguardando o acesso ao cluster ($tentativa/30)…"
+            sleep 10
+          done
+          kubectl wait --for=condition=Ready nodes --all --timeout=600s
+          kubectl get nodes
+
+      # O script cria o Secret (a partir dos segredos do GitHub e dos outputs do Terraform),
+      # recria o Job de migração, espera a conclusão e só então atualiza a API.
+      - name: Migrar o banco e atualizar a API
+        env:
+          IMAGEM: ${{ steps.imagem.outputs.imagem }}
+          JWT_CHAVE: ${{ secrets.JWT_CHAVE }}
+          SEED_SENHA_ADMIN: ${{ secrets.SEED_SENHA_ADMIN }}
+          SMTP_USUARIO: ${{ secrets.SMTP_USUARIO }}
+          SMTP_SENHA: ${{ secrets.SMTP_SENHA }}
+        run: |
+          CADEIA_DE_CONEXAO="$(terraform -chdir=infra/10-base output -raw banco_cadeia_de_conexao)"
+          echo "::add-mask::$CADEIA_DE_CONEXAO"
+          export CADEIA_DE_CONEXAO
+          bash k8s/overlays/aws/aplicar.sh
+
+      - name: Descobrir o endereço público
+        id: endereco
+        run: |
+          ENDERECO="$(kubectl -n automecanic get service automecanic-api -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
+          echo "url=http://$ENDERECO" >> "$GITHUB_OUTPUT"
+
+      # Os e-mails citam este endereço, que só existe depois do primeiro deploy.
+      - name: Informar o endereço à API (e-mails)
+        env:
+          URL: ${{ steps.endereco.outputs.url }}
+        run: |
+          kubectl -n automecanic patch secret automecanic-api --type merge \
+            -p "{\"stringData\":{\"Notificacoes__UrlPublicaDaApi\":\"$URL\"}}"
+          kubectl -n automecanic rollout restart deployment/automecanic-api
+          kubectl -n automecanic rollout status deployment/automecanic-api --timeout=300s
+
+      - name: Aguardar o balanceador responder
+        env:
+          URL: ${{ steps.endereco.outputs.url }}
+        run: |
+          for tentativa in $(seq 1 60); do
+            codigo="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$URL/health/pronto" || true)"
+            if [[ "$codigo" == "200" ]]; then echo "API respondendo."; exit 0; fi
+            echo "Aguardando o balanceador ($tentativa/60), último código: $codigo"
+            sleep 10
+          done
+          echo "::error::A API não respondeu a tempo no balanceador."
+          exit 1
+
+      # Teste de fumaça: as duas pastas da coleção, contra o endereço da AWS.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Teste de fumaça (Newman)
+        env:
+          URL: ${{ steps.endereco.outputs.url }}
+          SENHA: ${{ secrets.SEED_SENHA_ADMIN }}
+        run: |
+          for pasta in "00 · Fluxo completo da Ordem de Serviço" "00 · Fase 2 — abertura completa, resposta do cliente e fila"; do
+            npx --yes newman run postman/AutoMecanic.postman_collection.json \
+              --folder "$pasta" \
+              --env-var "baseUrl=$URL" \
+              --env-var "senhaAdmin=$SENHA" \
+              --reporters cli --color off
+          done
+
+      - name: Resumo
+        if: always()
+        env:
+          URL: ${{ steps.endereco.outputs.url }}
+          IMAGEM: ${{ steps.imagem.outputs.imagem }}
+        run: |
+          {
+            echo "## Deploy na AWS"
+            echo
+            echo "- Imagem: \`$IMAGEM\`"
+            echo "- Endereço: $URL (Swagger em \`/swagger\`)"
+            echo
+            echo "> ⚠️ **O cluster está ligado e cobrando (~US\$ 0,25 por hora).** Ele é destruído toda madrugada pelo workflow *Destruir cluster*; para desligar agora, dispare-o manualmente."
+          } >> "$GITHUB_STEP_SUMMARY"

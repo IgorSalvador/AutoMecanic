@@ -473,17 +473,23 @@ estado do S3. Está pronto. Avise para marcarmos o D1 como concluído.
 
 ## 12. O que vem depois
 
-Com o D1 concluído, o caminho é:
+Com o D1 concluído, o código das demais etapas já está escrito. Falta **aplicá-lo na sua conta**,
+nesta ordem, cada um com README próprio (e, em todos, a seção **Desligar**):
 
-| Etapa | O que faz | Custo enquanto existe |
-|---|---|---|
-| **D2 · `10-base`** | Rede, repositório de imagens (ECR), banco RDS, papel OIDC do CI | ~US$ 0,05 por hora (o RDS é o principal) |
-| **D3 · `20-cluster`** | Cluster EKS e nós | ~US$ 0,20 por hora |
-| **C3 · overlay `aws`** | Manifestos para o cluster real | — |
-| **E1 a E3 · GitHub Actions** | Build, deploy automático e destruição agendada do cluster | — |
+| Etapa | O que faz | Custo enquanto existe | Passo a passo |
+|---|---|---|---|
+| **D2 · `10-base`** | Rede, repositório de imagens (ECR), banco RDS, papel OIDC do CI | ~US$ 0,02/h (o RDS) | [`infra/10-base`](../infra/10-base/README.md) |
+| **D3 · `20-cluster`** | Cluster EKS e nós | ~US$ 0,20/h | [`infra/20-cluster`](../infra/20-cluster/README.md) |
+| **C3 · overlay `aws`** | A aplicação no cluster, com o load balancer | ~US$ 0,025/h | [`k8s/overlays/aws`](../k8s/overlays/aws/README.md) |
+| **E1 a E3 · GitHub Actions** | Validação nos PRs, deploy automático e destruição agendada | — | [Guia do deploy na AWS](09-guia-cd-aws.md) |
+
+Visão geral das camadas e da ordem de aplicar/destruir: [`infra/README.md`](../infra/README.md).
 
 Antes de começar o D2, vale **verificar a lista de serviços do plano gratuito** da conta (seção
-2) e decidir **com a equipe** se vale migrar para o plano pago.
+2) e decidir **com a equipe** se vale migrar para o plano pago, caso o EKS seja recusado.
+
+> 💰 **Lembrete:** ligado, o ambiente todo custa ~US$ 0,25 por hora. Termine sempre
+> destruindo o cluster.
 
 ---
 

@@ -340,36 +340,41 @@ Esperado: `Valid: 9, Invalid: 0` para o `base`, e `Valid: 15, Invalid: 0` para o
 
 ## Parte 2 · AWS
 
-> ### Situação: ainda não é possível testar na AWS
+> ### Situação: o código da AWS está pronto, mas nunca foi aplicado na nuvem
 >
-> A infraestrutura em nuvem **ainda não foi construída**. O que existe hoje é a preparação:
-> a imagem, os manifestos do `k8s/base` e o desenho em
-> [ADR-15](05-arquitetura.md#adr-15--nuvem-eks-rds-e-ecr-com-terraform-em-camadas-decidido-em-implementação).
-> Os itens abaixo são o **roteiro de teste** para quando cada tarefa do
-> [plano da Fase 2](fase2/plano-de-implementacao.md) for concluída. Os comandos exatos serão
-> confirmados e preenchidos em cada tarefa.
+> Terraform, manifestos e pipelines foram escritos e **validados sem a AWS** (`fmt`,
+> `validate`, renderização dos manifestos e simulação do script de deploy). O primeiro
+> `apply` real acontece quando você seguir o [guia AWS do zero](08-guia-aws-do-zero.md) e o
+> [guia do deploy na AWS](09-guia-cd-aws.md). **Até lá, trate o que está abaixo como roteiro de
+> teste**: se um passo falhar na primeira execução, é esperado ajustar o código.
+>
+> **Em todo teste na AWS, termine desligando.** Ligado, o ambiente custa ~US$ 0,25 por hora.
 
-### O que falta para testar na AWS
+### O que existe e como cada parte é desligada
 
-| Tarefa | O que entrega | Situação |
-|---|---|:-:|
-| D1 · `infra/00-bootstrap` | Bucket S3 do estado do Terraform | ⬜ |
-| D2 · `infra/10-base` | Rede, ECR, RDS, papel OIDC, Budgets | ⬜ |
-| D3 · `infra/20-cluster` | EKS e nós | ⬜ |
-| C3 · `k8s/overlays/aws` | Service LoadBalancer, imagem do ECR, RDS, SMTP do Gmail | ⬜ |
-| E1 a E3 · GitHub Actions | CI ampliado, `cd.yml`, `destruir-cluster.yml` | ⬜ |
+| Tarefa | O que entrega | Código | Como desligar |
+|---|---|:-:|---|
+| D1 · [`infra/00-bootstrap`](../infra/00-bootstrap/README.md) | Bucket S3 do estado | ✅ (aplicado) | Quase nunca destruir |
+| D2 · [`infra/10-base`](../infra/10-base/README.md) | Rede, ECR, RDS, papel OIDC, alarmes | ✅ pronto | `terraform destroy` (apaga o banco) |
+| D3 · [`infra/20-cluster`](../infra/20-cluster/README.md) | EKS e nós | ✅ pronto | Remover o balanceador e `terraform destroy` |
+| C3 · [`k8s/overlays/aws`](../k8s/overlays/aws/README.md) | NLB, imagem do ECR, RDS, Gmail | ✅ pronto | `kubectl delete -k k8s/overlays/aws` |
+| E1 · `ci.yml` | Valida manifestos e Terraform nos PRs | ✅ pronto | — |
+| E2 · `cd.yml` | Deploy completo | ✅ pronto | Workflow *Destruir cluster* |
+| E3 · `destruir-cluster.yml` | Destrói o cluster (agendado e manual) | ✅ pronto | — |
 
 ### Antes de qualquer teste
 
 - **Custo.** O ambiente completo custa cerca de **US$ 0,25 por hora** ligado (≈ US$ 185 por mês
-  se esquecido). Só suba para testar e **destrua ao terminar**. Os alarmes do AWS Budgets em
-  US$ 20, 50 e 100 já estão configurados (tarefa P3).
+  se esquecido). Só suba para testar e **destrua ao terminar**. Confirme que os alarmes do AWS
+  Budgets (US$ 20, 50 e 100) existem: criados à mão (guia AWS do zero, passo 5) ou pela camada
+  `10-base`.
 - **Credenciais.** Cada integrante com acesso IAM e MFA, região `us-east-1`.
 - **Ferramentas:** AWS CLI, Terraform e `kubectl`, além das da Parte 1.
-- **Segredos do GitHub:** `AWS_ROLE_ARN`, `JWT_CHAVE`, `SEED_SENHA_ADMIN`, `SMTP_USUARIO` e
-  `SMTP_SENHA`. Nenhum deve ir para o repositório.
+- **GitHub:** o ambiente `aws`, os 5 segredos (`AWS_ROLE_ARN`, `JWT_CHAVE`, `SEED_SENHA_ADMIN`,
+  `SMTP_USUARIO`, `SMTP_SENHA`) e as variáveis. Nenhum valor secreto vai para o repositório. Passo a
+  passo em [09 · Guia do deploy na AWS](09-guia-cd-aws.md#passo-2--configurar-o-github).
 
-### Roteiro de teste (a executar quando as tarefas estiverem prontas)
+### Roteiro de teste (em ordem; no fim, desligue)
 
 **1. Infraestrutura — após D1 a D3**
 
