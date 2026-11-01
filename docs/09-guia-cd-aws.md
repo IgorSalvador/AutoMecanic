@@ -326,7 +326,7 @@ Antes de fechar o computador:
 | Sintoma | Causa e solução |
 |---|---|
 | CD: "Faltam: secret …/variable …" | Falta configurar o item citado (passo 2). |
-| CD: `Not authorized to perform sts:AssumeRoleWithWebIdentity` | O `AWS_ROLE_ARN` está errado, ou o job rodou de uma branch/tag não permitida. Confira o ambiente `aws` e que o job usa `main` ou uma tag `v*`. |
+| CD: `Not authorized to perform sts:AssumeRoleWithWebIdentity` | O `AWS_ROLE_ARN` está errado, ou o `sub` do token não é um dos que o papel aceita (a AWS não diz qual). Imprima o `sub` decodificando o token (`ACTIONS_ID_TOKEN_REQUEST_URL` com `audience=sts.amazonaws.com`) e compare com a política do papel. O GitHub pode escrever o repositório por nome (`dono/nome`) ou por identificador (`dono@id/nome@id`); a camada `10-base` aceita os dois (variável `github_repositorio_imutavel`). |
 | CD fica "Waiting" para sempre | Aguarda a aprovação do ambiente `aws` (passo 4.3). |
 | `terraform apply` altera os administradores ou os alarmes | As variáveis do GitHub diferem das usadas à mão (passo 2.3). Alinhe-as. |
 | EKS recusado por causa do plano da conta | O plano gratuito pode bloquear o serviço; migrar para o pago é decisão da equipe (veja o guia AWS do zero, seção 2). |

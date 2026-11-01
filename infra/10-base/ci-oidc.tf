@@ -26,13 +26,18 @@ data "aws_iam_policy_document" "ci_confianca" {
     #   · workflows na branch main;
     #   · jobs do environment protegido (que exige aprovação). Quando um job usa um environment,
     #     o GitHub troca o "sub" do token e ele deixa de conter a branch.
+    # O GitHub escreve o repositório no "sub" por nome (dono/nome) ou, com o assunto imutável,
+    # por identificadores numéricos (dono@id/nome@id). Aceitamos os dois formatos, com as mesmas
+    # duas travas (main e environment); nenhum deles libera outra branch.
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values = [
-        "repo:${var.github_repositorio}:ref:refs/heads/main",
-        "repo:${var.github_repositorio}:environment:${var.github_ambiente}",
-      ]
+      values = flatten([
+        for repo in compact([var.github_repositorio, var.github_repositorio_imutavel]) : [
+          "repo:${repo}:ref:refs/heads/main",
+          "repo:${repo}:environment:${var.github_ambiente}",
+        ]
+      ])
     }
   }
 }
