@@ -28,6 +28,12 @@ variable "github_repositorio" {
   default     = "IgorSalvador/AutoMecanic"
 }
 
+variable "github_repositorio_imutavel" {
+  description = "Repositório no formato com identificadores numéricos (dono@id/nome@id), usado pelo GitHub no \"sub\" do token quando o assunto imutável está ligado. Vazio para aceitar só o formato por nome."
+  type        = string
+  default     = "IgorSalvador@68258523/AutoMecanic@1349175091"
+}
+
 variable "github_ambiente" {
   description = "Nome do environment do GitHub Actions que protege o deploy (exige aprovação)."
   type        = string
