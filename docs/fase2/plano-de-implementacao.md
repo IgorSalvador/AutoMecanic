@@ -77,7 +77,7 @@ do dia a dia é no kind, e um *workflow* agendado destrói o cluster toda madrug
 | **A9** | **Outbox e e-mail:** tabela `mensagem_saida`; handler grava a mensagem na transação da mudança de status; porta `IEnviadorDeEmail` com adaptador MailKit; `BackgroundService` com `FOR UPDATE SKIP LOCKED`, novas tentativas com intervalo crescente e limite de tentativas; templates da equipe para OS aberta, orçamento enviado (com número e instruções de aprovação), em execução, finalizada, entregue e cancelada | E-mail chega no Mailpit; teste de integração com Mailpit via Testcontainers. **Ponto de reavaliação:** trocar a outbox por envio simples só muda o despachante | G | A1 | ✅ |
 | **A10** | **Migração fora da inicialização:** modo `--migrar` no binário (mesmo padrão do `--health-check`), que migra, faz o seed e encerra; `MigrarNaInicializacao=false` no K8s | Job do K8s migra; a API não migra | P | — | ✅ |
 | **A11** | **Expiração como CronJob:** modo `--expirar-orcamentos` no binário | Teste do caso de uso | P | A10 | ✅ |
-| **A12** | **Ajustes para escalar:** `ForwardedHeaders` atrás do load balancer; Swagger e redirecionamento HTTPS configuráveis; encerramento gracioso do *worker*; `Version` do `Directory.Build.props` em `2.0.0` na entrega | Limites ajustáveis pelo ConfigMap | P | A9 | ⬜ |
+| **A12** | **Ajustes para escalar:** `ForwardedHeaders` atrás do load balancer; Swagger e redirecionamento HTTPS configuráveis; encerramento gracioso do *worker*; `Version` do `Directory.Build.props` em `2.0.0` na entrega | Limites ajustáveis pelo ConfigMap | P | A9 | ✅ |
 
 > **Migrações do EF:** A8 e A9 geram migrações, que conflitam no `ModelSnapshot` se feitas em
 > paralelo. Regra: uma migração por PR, sempre regerada depois do *rebase*.
@@ -88,8 +88,8 @@ do dia a dia é no kind, e um *workflow* agendado destrói o cluster toda madrug
 
 | ID | Tarefa | Tam. | Depende | Situação |
 |---|---|:-:|---|:-:|
-| B1 | Dockerfile: copiar o novo projeto de testes no estágio de restore; labels OCI (`source`, `revision`, `version`) | P | A4 | ⬜ |
-| B2 | docker-compose: serviço Mailpit (interface na porta 8025); variáveis `SMTP_*` no `.env.example` | P | A9 | ⬜ |
+| B1 | Dockerfile: copiar o novo projeto de testes no estágio de restore; labels OCI (`source`, `revision`, `version`) | P | A4 | ✅ |
+| B2 | docker-compose: serviço Mailpit (interface na porta 8025); variáveis `SMTP_*` no `.env.example` | P | A9 | ✅ |
 
 ---
 
@@ -105,10 +105,10 @@ k8s/
 
 | ID | Tarefa | Critério de pronto | Tam. | Depende | Situação |
 |---|---|---|:-:|---|:-:|
-| **C1** | **`base/`:** Namespace, ConfigMap, modelo de Secret (sem valores reais no git), Deployment, Service (ClusterIP), HPA, Job de migração e CronJob de expiração | `kubectl apply -k` válido | M | A10, A11 | ⬜ |
-| **C2** | **`overlays/local/`:** PostgreSQL em StatefulSet com volume persistente, Mailpit, metrics-server e script para subir o cluster com kind | Fluxo completo local; HPA lendo métricas | M | C1 | ⬜ |
-| **C3** | **`overlays/aws/`:** Service do tipo LoadBalancer (NLB), imagem do ECR, endpoint do RDS, SMTP do Gmail | Aplicado no EKS | P | C1, D3 | ⬜ |
-| **C4** | **Carga para o HPA:** script k6 executado como Job no cluster | `kubectl get hpa -w` mostra os pods subindo e descendo | P | C2 | ⬜ |
+| **C1** | **`base/`:** Namespace, ConfigMap, modelo de Secret (sem valores reais no git), Deployment, Service (ClusterIP), HPA, Job de migração e CronJob de expiração | `kubectl apply -k` válido | M | A10, A11 | ✅ |
+| **C2** | **`overlays/local/`:** PostgreSQL em StatefulSet com volume persistente, Mailpit, metrics-server e script para subir o cluster com kind | Fluxo completo local; HPA lendo métricas | M | C1 | ✅ |
+| **C3** | **`overlays/aws/`:** Service do tipo LoadBalancer (NLB), imagem do ECR, endpoint do RDS, SMTP do Gmail | Aplicado no EKS | P | C1, D3 | 🟨 |
+| **C4** | **Carga para o HPA:** script k6 executado como Job no cluster | `kubectl get hpa -w` mostra os pods subindo e descendo | P | C2 | ✅ |
 
 Detalhes do `base/`:
 
@@ -132,10 +132,10 @@ infra/
 
 | ID | Tarefa | Critério de pronto | Tam. | Depende | Situação |
 |---|---|---|:-:|---|:-:|
-| **D1** | **`00-bootstrap/`:** bucket S3 do estado (versionado, criptografado, sem acesso público), trava nativa via `use_lockfile` (sem DynamoDB) | Estado remoto funcionando | P | — | ⬜ |
-| **D2** | **`10-base/`:** rede, ECR, RDS, papel OIDC do CI e Budgets como código (detalhes abaixo) | `apply` e `destroy` limpos | M | D1 | ⬜ |
-| **D3** | **`20-cluster/`:** EKS via `terraform-aws-modules/eks`; 2 nós t3.medium (Spot opcional); *access entries* para o papel do CI e os três integrantes; add-ons vpc-cni, coredns, kube-proxy e metrics-server | Cluster sobe em ~15 min e é destruído sem resíduo | M | D2 | ⬜ |
-| **D4** | **`infra/README.md`:** recursos criados por camada, custo por hora, ordem para aplicar e destruir | — | P | D3 | ⬜ |
+| **D1** | **`00-bootstrap/`:** bucket S3 do estado (versionado, criptografado, sem acesso público), trava nativa via `use_lockfile` (sem DynamoDB) | Estado remoto funcionando | P | — | 🟨 |
+| **D2** | **`10-base/`:** rede, ECR, RDS, papel OIDC do CI e Budgets como código (detalhes abaixo) | `apply` e `destroy` limpos | M | D1 | 🟨 |
+| **D3** | **`20-cluster/`:** EKS via `terraform-aws-modules/eks`; 2 nós t3.medium (Spot opcional); *access entries* para o papel do CI e os três integrantes; add-ons vpc-cni, coredns, kube-proxy e metrics-server | Cluster sobe em ~15 min e é destruído sem resíduo | M | D2 | 🟨 |
+| **D4** | **`infra/README.md`:** recursos criados por camada, custo por hora, ordem para aplicar e destruir | — | P | D3 | ✅ |
 
 Detalhes do `10-base/`:
 
@@ -152,9 +152,9 @@ Detalhes do `10-base/`:
 
 | ID | Tarefa | Tam. | Depende | Situação |
 |---|---|:-:|---|:-:|
-| **E1** | **`ci.yml` ampliado:** validação dos manifestos (kubeconform); `terraform fmt` e `validate` nos PRs | P | C1, D2 | ⬜ |
-| **E2** | **`cd.yml`** (push na `main` ou disparo manual; *environment* `aws` protegido por aprovação), com os passos abaixo | G | A10, C3, D3 | ⬜ |
-| **E3** | **`destruir-cluster.yml`:** disparo manual **e agendado toda madrugada**; destrói só a camada `20-cluster` | P | D3 | ⬜ |
+| **E1** | **`ci.yml` ampliado:** validação dos manifestos (kubeconform); `terraform fmt` e `validate` nos PRs | P | C1, D2 | ✅ |
+| **E2** | **`cd.yml`** (push na `main` ou disparo manual; *environment* `aws` protegido por aprovação), com os passos abaixo | G | A10, C3, D3 | 🟨 |
+| **E3** | **`destruir-cluster.yml`:** disparo manual **e agendado toda madrugada**; destrói só a camada `20-cluster` | P | D3 | 🟨 |
 
 Passos do `cd.yml`:
 
@@ -177,8 +177,8 @@ Passos do `cd.yml`:
 | ID | Tarefa | Tam. | Depende | Situação |
 |---|---|:-:|---|:-:|
 | F1 | README reescrito: objetivos da fase; diagramas Mermaid de componentes, infraestrutura AWS e fluxo de deploy; instruções de execução local, em Kubernetes e com Terraform; links da collection e do vídeo | M | E2 | ⬜ |
-| F2 | `docs/05-arquitetura.md`: novos ADRs (EKS, outbox, migração como Job, Kustomize, Gmail SMTP, OIDC) | P | — | ⬜ |
-| F3 | Collection Postman regerada, com pasta do fluxo da Fase 2 (abertura completa → aprovação pelo cliente → listagem) | P | A5–A8 | ⬜ |
+| F2 | `docs/05-arquitetura.md`: novos ADRs (EKS, outbox, migração como Job, Kustomize, Gmail SMTP, OIDC) | P | — | ✅ |
+| F3 | Collection Postman regerada, com pasta do fluxo da Fase 2 (abertura completa → aprovação pelo cliente → listagem) | P | A5–A8 | ✅ |
 | F4 | Relatório de segurança atualizado: rota pública de aprovação, segredo SMTP, nuvem | P | E2 | ⬜ |
 | F5 | Roteiro do vídeo (até 15 min): deploy, CI/CD, APIs e autoescala | P | C4, E2 | ⬜ |
 | F6 | `ENTREGA.md`, PDF do portal e tag `v2.0.0` | P | F1 | ⬜ |

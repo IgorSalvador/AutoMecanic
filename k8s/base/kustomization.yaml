@@ -1,0 +1,33 @@
+# Recursos comuns a qualquer cluster. Os overlays (local, aws) completam o que muda:
+# imagem, endereço do banco, SMTP, tipo do Service e o Secret.
+#
+#   kubectl kustomize k8s/overlays/local
+#   kubectl apply -k k8s/overlays/local
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: automecanic
+
+resources:
+  - namespace.yaml
+  - serviceaccount.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - job-migracao.yaml
+  - cronjob-expiracao.yaml
+  # secret.modelo.yaml NÃO entra aqui de propósito: é só o formato do Secret. Quem cria o
+  # Secret de verdade é o overlay local (valores de desenvolvimento) ou o CD (valores do GitHub).
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: automecanic
+    includeSelectors: false
+
+# A tag real é definida por overlay (`images:`); esta é só a referência padrão.
+images:
+  - name: automecanic-api
+    newName: automecanic-api
+    newTag: 2.0.0

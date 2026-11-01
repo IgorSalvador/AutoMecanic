@@ -36,11 +36,25 @@ services:
     networks:
       - automecanic
 
+  # Servidor SMTP de desenvolvimento: recebe os e-mails da API sem entregá-los a ninguém.
+  # Caixa de entrada em http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: automecanic-mailpit
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAILPIT_UI_PORT:-8025}:8025"
+    networks:
+      - automecanic
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    image: automecanic-api:1.0.0
+      args:
+        VERSAO: 2.0.0
+        REVISAO: ${GIT_REVISAO:-desconhecida}
+    image: automecanic-api:2.0.0
     container_name: automecanic-api
     restart: unless-stopped
     depends_on:
@@ -48,6 +62,8 @@ services:
         # Só inicia depois que o banco responde: evita a falha de migração na
         # primeira subida, quando o PostgreSQL ainda está inicializando.
         condition: service_healthy
+      mailpit:
+        condition: service_started
     environment:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
       ASPNETCORE_HTTP_PORTS: 8080
@@ -64,6 +80,15 @@ services:
       BancoDeDados__SemearDados: "true"
       Seed__SenhaDoAdministrador: ${SEED_SENHA_ADMIN:?defina SEED_SENHA_ADMIN no arquivo .env}
       Seed__IncluirDadosDeDemonstracao: ${SEED_DEMO:-true}
+
+      Notificacoes__Habilitadas: ${NOTIFICACOES_HABILITADAS:-true}
+      Notificacoes__UrlPublicaDaApi: ${URL_PUBLICA_DA_API:-http://localhost:8080}
+      Smtp__Host: ${SMTP_HOST:-mailpit}
+      Smtp__Porta: ${SMTP_PORTA:-1025}
+      Smtp__Seguranca: ${SMTP_SEGURANCA:-Nenhuma}
+      Smtp__Usuario: ${SMTP_USUARIO:-}
+      Smtp__Senha: ${SMTP_SENHA:-}
+      Smtp__Remetente: ${SMTP_REMETENTE:-oficina@automecanic.local}
 
       Cors__OrigensPermitidas__0: ${CORS_ORIGEM:-http://localhost:3000}
       TZ: America/Sao_Paulo

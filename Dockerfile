@@ -55,6 +55,16 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled AS final
 #
 # A imagem já roda como usuário sem privilégios (UID 1654); não é preciso USER.
 
+# Metadados OCI. O CI informa versão e commit com --build-arg; localmente ficam com os padrões.
+ARG VERSAO=2.0.0
+ARG REVISAO=desconhecida
+LABEL org.opencontainers.image.title="AutoMecanic API" \
+      org.opencontainers.image.description="API do Sistema Integrado de Atendimento e Execução de Serviços da oficina AutoMecanic" \
+      org.opencontainers.image.source="https://github.com/IgorSalvador/AutoMecanic" \
+      org.opencontainers.image.version="${VERSAO}" \
+      org.opencontainers.image.revision="${REVISAO}" \
+      org.opencontainers.image.licenses="MIT"
+
 WORKDIR /aplicacao
 COPY --from=publish --chown=$APP_UID:$APP_UID /aplicacao ./
 

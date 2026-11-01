@@ -1,0 +1,63 @@
+# Gera carga contra a API de dentro do cluster, para o HPA escalar.
+#
+#   kubectl apply -k k8s/overlays/local/carga
+#   kubectl -n automecanic get hpa -w          (em outro terminal)
+#   kubectl -n automecanic logs -f job/carga-k6
+#   kubectl delete -k k8s/overlays/local/carga (limpa, e permite repetir)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: carga-k6
+  labels:
+    app.kubernetes.io/name: carga-k6
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 1800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: carga-k6
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 12345
+        runAsGroup: 12345
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: k6
+          image: grafana/k6:1.0.0
+          args: ["run", "/scripts/k6-carga.js"]
+          env:
+            - name: ALVO
+              value: http://automecanic-api
+            - name: USUARIOS_PICO
+              value: "40"
+            - name: DURACAO_PICO
+              value: 3m
+            - name: SENHA_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: automecanic-api
+                  key: Seed__SenhaDoAdministrador
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+              readOnly: true
+      volumes:
+        - name: scripts
+          configMap:
+            name: k6-carga

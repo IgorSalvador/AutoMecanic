@@ -1,0 +1,61 @@
+# Expira os orçamentos vencidos e devolve as reservas de peça. Uma execução por vez,
+# independente do número de réplicas da API.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: automecanic-expiracao
+  labels:
+    app.kubernetes.io/name: automecanic-expiracao
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: America/Sao_Paulo
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: automecanic-expiracao
+        spec:
+          restartPolicy: Never
+          serviceAccountName: automecanic-api
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1654
+            runAsGroup: 1654
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: expirar
+              image: automecanic-api
+              imagePullPolicy: IfNotPresent
+              args: ["--expirar-orcamentos"]
+              envFrom:
+                - configMapRef:
+                    name: automecanic-api
+                - secretRef:
+                    name: automecanic-api
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  cpu: 300m
+                  memory: 384Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi

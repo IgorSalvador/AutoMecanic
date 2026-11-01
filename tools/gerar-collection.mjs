@@ -718,6 +718,309 @@ function pastaDeFluxo() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Pasta "Fase 2" — abertura completa, resposta do cliente e fila priorizada
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Cliente e veículo próprios, para esta pasta não depender do estado deixado pela anterior.
+const DOCUMENTO_FASE2 = '529.982.247-25';
+const DOCUMENTO_FASE2_SEM_MASCARA = '52998224725';
+const PLACA_FASE2 = 'QWE4R56';
+
+const corpoDaRecepcaoCompleta = (problema) => ({
+  documentoCliente: DOCUMENTO_FASE2,
+  nomeCliente: 'Marina Souza',
+  emailCliente: 'marina.souza@exemplo.com.br',
+  telefoneCliente: '(11) 98765-4321',
+  placa: PLACA_FASE2,
+  marca: 'Honda',
+  modelo: 'Civic EXL 2.0',
+  anoFabricacao: 2020,
+  anoModelo: 2020,
+  cor: 'Preto',
+  descricaoProblema: problema,
+  quilometragemEntrada: 58000,
+  servicos: [{ servicoId: '{{servicoId}}', quantidade: 1 }],
+  pecas: [{ pecaId: '{{pecaId}}', quantidade: 2 }],
+});
+
+// Leva a OS recém-aberta até "Aguardando aprovação": diagnóstico, orçamento e envio.
+const etapasAteOEnvio = (prefixo, osId) => [
+  requisicao({
+    nome: `${prefixo}.1 · Iniciar diagnóstico`,
+    metodo: 'POST',
+    caminho: `/api/v1/ordens-servico/{{${osId}}}/diagnostico/iniciar`,
+    testes: [esperaStatus(200, 'Diagnóstico iniciado')],
+  }),
+  requisicao({
+    nome: `${prefixo}.2 · Gerar orçamento`,
+    metodo: 'POST',
+    caminho: `/api/v1/ordens-servico/{{${osId}}}/orcamento`,
+    corpo: { percentualDesconto: 0 },
+    testes: [
+      esperaStatus(200, 'Orçamento gerado'),
+      'pm.test("Orçamento tem valor", () => pm.expect(pm.response.json().orcamento.valorTotal).to.be.above(0));',
+    ],
+  }),
+  requisicao({
+    nome: `${prefixo}.3 · Enviar ao cliente → Aguardando aprovação`,
+    metodo: 'POST',
+    caminho: `/api/v1/ordens-servico/{{${osId}}}/orcamento/enviar`,
+    corpo: { validadeEmDias: 7 },
+    descricao:
+      'Neste momento a caixa de saída grava o e-mail do orçamento, com o número da OS e as '
+      + 'instruções de aprovação. Em desenvolvimento, ele aparece no Mailpit (http://localhost:8025).',
+    testes: [
+      esperaStatus(200, 'Orçamento enviado'),
+      'pm.test("Status Aguardando aprovação", () =>',
+      '    pm.expect(pm.response.json().status).to.eql("AguardandoAprovacao"));',
+    ],
+  }),
+];
+
+function pastaDaFase2() {
+  const prioridade = { EmExecucao: 1, AguardandoAprovacao: 2, EmDiagnostico: 3, Recebida: 4 };
+
+  return {
+    name: '00 · Fase 2 — abertura completa, resposta do cliente e fila',
+    description:
+      'Fluxo da Fase 2, independente da pasta anterior (usa outro cliente e outro veículo).\n\n'
+      + '**A** — a OS é aberta já com serviços e peças, o cliente aprova o orçamento pela rota '
+      + 'pública e a fila de trabalho mostra a OS em execução.\n\n'
+      + '**B** — outra OS é aberta, o cliente recusa o orçamento e as reservas voltam ao estoque.\n\n'
+      + 'Os e-mails de cada mudança de situação podem ser conferidos no Mailpit (http://localhost:8025).',
+    item: [
+      requisicao({
+        nome: 'F2.01 · Login — guarda o token',
+        metodo: 'POST',
+        caminho: '/api/v1/autenticacao/login',
+        anonima: true,
+        corpo: { email: '{{emailAdmin}}', senha: '{{senhaAdmin}}' },
+        testes: [esperaStatus(200, 'Login bem-sucedido'), guarda('token', '.token')],
+      }),
+
+      requisicao({
+        nome: 'F2.02 · Catálogo e estoque — guarda serviço e peça',
+        metodo: 'GET',
+        caminho: '/api/v1/servicos?apenasAtivos=true&tamanhoPagina=1',
+        testes: [esperaStatus(200, 'Catálogo disponível'), guarda('servicoId', '.itens[0].id')],
+      }),
+
+      requisicao({
+        nome: 'F2.03 · Peça escolhida — saldo de partida',
+        metodo: 'GET',
+        caminho: '/api/v1/pecas?apenasAtivas=true&tamanhoPagina=1',
+        testes: [
+          esperaStatus(200, 'Estoque disponível'),
+          guarda('pecaId', '.itens[0].id'),
+          'pm.collectionVariables.set("saldoAntesF2", pm.response.json().itens[0].quantidadeEmEstoque);',
+          'pm.collectionVariables.set("reservadoAntesF2", pm.response.json().itens[0].quantidadeReservada);',
+        ],
+      }),
+
+      // ── A · cliente aprova ────────────────────────────────────────────────
+      requisicao({
+        nome: 'A1 · Recepção completa → 201 com id e número',
+        metodo: 'POST',
+        caminho: '/api/v1/ordens-servico/recepcao',
+        corpo: corpoDaRecepcaoCompleta('Luz da injeção acesa e marcha lenta irregular.'),
+        descricao:
+          'Cliente, veículo, serviços e peças em uma única chamada e uma única transação. Sem '
+          + 'saldo para alguma peça, nada é gravado, nem o número da OS.',
+        testes: [
+          esperaStatus(201, 'OS aberta'),
+          'const os = pm.response.json();',
+          'pm.test("Nasce Recebida", () => pm.expect(os.status).to.eql("Recebida"));',
+          'pm.test("Veio com o serviço", () => pm.expect(os.servicos.length).to.eql(1));',
+          'pm.test("Veio com a peça reservada", () => {',
+          '    pm.expect(os.pecas.length).to.eql(1);',
+          '    pm.expect(os.pecas[0].reservada).to.be.true;',
+          '});',
+          'pm.test("Resposta traz id e número", () => pm.expect(os.numero).to.match(/^OS-\\d{4}-\\d{6}$/));',
+          guarda('osIdA', '.id'),
+          guarda('osNumeroA', '.numero'),
+          guarda('clienteIdF2', '.clienteId'),
+        ],
+      }),
+
+      requisicao({
+        nome: 'A2 · Reserva feita, saldo físico intacto',
+        metodo: 'GET',
+        caminho: '/api/v1/pecas/{{pecaId}}',
+        testes: [
+          esperaStatus(200, 'Peça consultada'),
+          'const p = pm.response.json();',
+          'pm.test("Saldo físico intacto", () =>',
+          '    pm.expect(p.quantidadeEmEstoque).to.eql(Number(pm.collectionVariables.get("saldoAntesF2"))));',
+          'pm.test("Reservou 2", () =>',
+          '    pm.expect(p.quantidadeReservada).to.eql(Number(pm.collectionVariables.get("reservadoAntesF2")) + 2));',
+        ],
+      }),
+
+      requisicao({
+        nome: 'A3 · Consulta de status (autenticada)',
+        metodo: 'GET',
+        caminho: '/api/v1/ordens-servico/{{osIdA}}/status',
+        descricao: 'Payload enxuto, para painéis e integrações. O cliente usa o acompanhamento público.',
+        testes: [
+          esperaStatus(200, 'Status consultado'),
+          'const s = pm.response.json();',
+          'pm.test("Situação Recebida e não encerrada", () => {',
+          '    pm.expect(s.status).to.eql("Recebida");',
+          '    pm.expect(s.encerrada).to.be.false;',
+          '});',
+          'pm.test("Payload leve", () => pm.expect(Object.keys(s).length).to.be.below(8));',
+        ],
+      }),
+
+      ...etapasAteOEnvio('A', 'osIdA'),
+
+      requisicao({
+        nome: 'A4 · Cliente aprova pela rota pública → Em execução',
+        metodo: 'POST',
+        caminho: '/api/v1/acompanhamento/orcamento/aprovar',
+        anonima: true,
+        corpo: { numero: '{{osNumeroA}}', documento: DOCUMENTO_FASE2_SEM_MASCARA },
+        descricao: 'Sem autenticação: o número da OS (enviado por e-mail) e o CPF identificam o titular.',
+        testes: [
+          esperaStatus(200, 'Orçamento aprovado pelo cliente'),
+          'pm.test("OS em execução", () => pm.expect(pm.response.json().status).to.eql("EmExecucao"));',
+        ],
+      }),
+
+      requisicao({
+        nome: 'A5 · Aprovar de novo → 422',
+        metodo: 'POST',
+        caminho: '/api/v1/acompanhamento/orcamento/aprovar',
+        anonima: true,
+        corpo: { numero: '{{osNumeroA}}', documento: DOCUMENTO_FASE2_SEM_MASCARA },
+        descricao: 'O orçamento já foi respondido: a segunda tentativa é recusada e nada muda.',
+        testes: [esperaStatus(422, 'Segunda aprovação recusada')],
+      }),
+
+      requisicao({
+        nome: 'A6 · Documento de terceiro → 404, igual a OS inexistente',
+        metodo: 'POST',
+        caminho: '/api/v1/acompanhamento/orcamento/aprovar',
+        anonima: true,
+        corpo: { numero: '{{osNumeroA}}', documento: '11144477735' },
+        testes: [esperaStatus(404, 'Resposta idêntica à de OS inexistente')],
+      }),
+
+      requisicao({
+        nome: 'A7 · Peças baixadas do estoque',
+        metodo: 'GET',
+        caminho: '/api/v1/pecas/{{pecaId}}',
+        testes: [
+          esperaStatus(200, 'Peça consultada'),
+          'pm.test("Saldo reduzido em 2", () =>',
+          '    pm.expect(pm.response.json().quantidadeEmEstoque).to.eql(Number(pm.collectionVariables.get("saldoAntesF2")) - 2));',
+        ],
+      }),
+
+      requisicao({
+        nome: 'A8 · Fila priorizada — só o que está em andamento',
+        metodo: 'GET',
+        caminho: '/api/v1/ordens-servico?tamanhoPagina=100',
+        descricao:
+          'Ordem: Em execução, Aguardando aprovação, Em diagnóstico, Recebida; dentro de cada '
+          + 'situação, as mais antigas primeiro. Finalizadas, entregues e canceladas ficam de fora.',
+        testes: [
+          esperaStatus(200, 'Fila disponível'),
+          'const itens = pm.response.json().itens;',
+          `const prioridade = ${JSON.stringify(prioridade)};`,
+          'pm.test("Nenhuma OS encerrada na fila", () =>',
+          '    itens.forEach(i => pm.expect(prioridade).to.have.property(i.status)));',
+          'pm.test("Situações em ordem de prioridade", () => {',
+          '    for (let i = 1; i < itens.length; i++) {',
+          '        pm.expect(prioridade[itens[i - 1].status]).to.be.at.most(prioridade[itens[i].status]);',
+          '    }',
+          '});',
+          'pm.test("Mais antigas primeiro dentro da situação", () => {',
+          '    for (let i = 1; i < itens.length; i++) {',
+          '        if (itens[i - 1].status === itens[i].status) {',
+          '            pm.expect(new Date(itens[i - 1].criadaEm) <= new Date(itens[i].criadaEm)).to.be.true;',
+          '        }',
+          '    }',
+          '});',
+          'pm.test("A OS aprovada está na fila", () =>',
+          '    pm.expect(itens.some(i => i.id === pm.collectionVariables.get("osIdA"))).to.be.true);',
+        ],
+      }),
+
+      requisicao({
+        nome: 'A9 · Finalizar o serviço',
+        metodo: 'POST',
+        caminho: '/api/v1/ordens-servico/{{osIdA}}/finalizar',
+        corpo: { observacao: 'Serviço concluído.' },
+        descricao: 'Finalizar e entregar deixam o veículo livre para a pasta poder ser repetida.',
+        testes: [esperaStatus(200, 'OS finalizada')],
+      }),
+
+      requisicao({
+        nome: 'A10 · Entregar o veículo',
+        metodo: 'POST',
+        caminho: '/api/v1/ordens-servico/{{osIdA}}/entregar',
+        corpo: { observacao: 'Retirado pelo cliente.' },
+        testes: [
+          esperaStatus(200, 'Veículo entregue'),
+          'pm.test("Status Entregue", () => pm.expect(pm.response.json().status).to.eql("Entregue"));',
+        ],
+      }),
+
+      // ── B · cliente recusa ────────────────────────────────────────────────
+      requisicao({
+        nome: 'B1 · Nova OS completa, com outra placa',
+        metodo: 'POST',
+        caminho: '/api/v1/ordens-servico/recepcao',
+        corpo: { ...corpoDaRecepcaoCompleta('Barulho na suspensão traseira.'), placa: 'RTY7U89' },
+        testes: [
+          esperaStatus(201, 'OS aberta'),
+          guarda('osIdB', '.id'),
+          guarda('osNumeroB', '.numero'),
+        ],
+      }),
+
+      ...etapasAteOEnvio('B', 'osIdB'),
+
+      requisicao({
+        nome: 'B2 · Cliente recusa pela rota pública → Cancelada',
+        metodo: 'POST',
+        caminho: '/api/v1/acompanhamento/orcamento/reprovar',
+        anonima: true,
+        corpo: { numero: '{{osNumeroB}}', documento: DOCUMENTO_FASE2_SEM_MASCARA, motivo: 'Valor acima do esperado.' },
+        testes: [
+          esperaStatus(200, 'Orçamento recusado pelo cliente'),
+          'pm.test("OS cancelada", () => pm.expect(pm.response.json().status).to.eql("Cancelada"));',
+        ],
+      }),
+
+      requisicao({
+        nome: 'B3 · Reservas devolvidas ao estoque',
+        metodo: 'GET',
+        caminho: '/api/v1/pecas/{{pecaId}}',
+        testes: [
+          esperaStatus(200, 'Peça consultada'),
+          'pm.test("Nenhuma reserva pendente da OS recusada", () =>',
+          '    pm.expect(pm.response.json().quantidadeReservada).to.eql(Number(pm.collectionVariables.get("reservadoAntesF2"))));',
+        ],
+      }),
+
+      requisicao({
+        nome: 'B4 · A OS cancelada sai da fila, mas está no histórico',
+        metodo: 'GET',
+        caminho: '/api/v1/ordens-servico?incluirEncerradas=true&clienteId={{clienteIdF2}}&tamanhoPagina=100',
+        descricao: '`incluirEncerradas=true` traz o histórico (finalizadas, entregues e canceladas).',
+        testes: [
+          esperaStatus(200, 'Histórico disponível'),
+          'pm.test("A OS recusada aparece no histórico", () =>',
+          '    pm.expect(pm.response.json().itens.some(i => i.id === pm.collectionVariables.get("osIdB") && i.status === "Cancelada")).to.be.true);',
+        ],
+      }),
+    ],
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Montagem
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -742,7 +1045,7 @@ async function main() {
       name: 'AutoMecanic — Oficina Mecânica',
       description:
         '# AutoMecanic\n\n'
-        + 'Sistema Integrado de Atendimento e Execução de Serviços — Tech Challenge Fase 1, '
+        + 'Sistema Integrado de Atendimento e Execução de Serviços — Tech Challenge Fases 1 e 2, '
         + 'Pós-Tech FIAP 15SOAT.\n\n'
         + '## Como usar\n\n'
         + '1. Suba o ambiente: `docker compose up -d --build`\n'
@@ -753,6 +1056,8 @@ async function main() {
         + '## Organização\n\n'
         + '- **00 · Fluxo completo** — o ciclo de vida da Ordem de Serviço na ordem em que a oficina '
         + 'trabalha, com verificações automáticas. Inclui os casos negativos que demonstram as regras.\n'
+        + '- **00 · Fase 2** — abertura completa com serviços e peças, aprovação e recusa pelo próprio '
+        + 'cliente e fila de trabalho priorizada, também com verificações automáticas.\n'
         + '- **01 a 10** — referência de todos os endpoints, agrupados por recurso e gerados a partir '
         + 'do OpenAPI da própria API.\n\n'
         + `_Gerada a partir do OpenAPI em ${new Date().toISOString().slice(0, 10)}. `
@@ -800,8 +1105,15 @@ async function main() {
       { key: 'itemId', value: '', type: 'string' },
       { key: 'codigoPeca', value: 'OL-5W30-1L', type: 'string' },
       { key: 'saldoAntes', value: '', type: 'string' },
+      { key: 'saldoAntesF2', value: '', type: 'string' },
+      { key: 'reservadoAntesF2', value: '', type: 'string' },
+      { key: 'osIdA', value: '', type: 'string' },
+      { key: 'osNumeroA', value: '', type: 'string' },
+      { key: 'osIdB', value: '', type: 'string' },
+      { key: 'osNumeroB', value: '', type: 'string' },
+      { key: 'clienteIdF2', value: '', type: 'string' },
     ],
-    item: [pastaDeFluxo(), ...pastasDeReferencia(doc)],
+    item: [pastaDeFluxo(), pastaDaFase2(), ...pastasDeReferencia(doc)],
   };
 
   const ambiente = {

@@ -1,0 +1,6 @@
+# Copie para terraform.tfvars (que o .gitignore não deixa ir para o git) e ajuste.
+emails_de_alerta = ["voce@exemplo.com", "colega@exemplo.com"]
+
+# Se os alarmes de gasto já existem (criados à mão), deixe false para o Terraform não tentar
+# recriá-los, ou importe-os (ver README).
+# criar_orcamentos = false

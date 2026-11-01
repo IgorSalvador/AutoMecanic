@@ -38,3 +38,11 @@ secrets.json
 ## Ferramentas
 .sonarqube/
 BenchmarkDotNet.Artifacts/
+
+# Terraform: estado e plugins nunca vão para o git (o .terraform.lock.hcl, sim)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.exemplo
+crash.log

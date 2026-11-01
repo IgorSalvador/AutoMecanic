@@ -1,0 +1,16 @@
+# Cluster kind de um nó. As portas de nó dos Services (30080 API, 30025 Mailpit) são
+# publicadas no computador, só em 127.0.0.1.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: automecanic
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8080
+        listenAddress: 127.0.0.1
+        protocol: TCP
+      - containerPort: 30025
+        hostPort: 8025
+        listenAddress: 127.0.0.1
+        protocol: TCP

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a17e0c5e-0000-4000-8000-automecanic01",
     "name": "AutoMecanic — Oficina Mecânica",
-    "description": "# AutoMecanic\n\nSistema Integrado de Atendimento e Execução de Serviços — Tech Challenge Fase 1, Pós-Tech FIAP 15SOAT.\n\n## Como usar\n\n1. Suba o ambiente: `docker compose up -d --build`\n2. Ajuste a variável `senhaAdmin` para o valor de `SEED_SENHA_ADMIN` do seu `.env`\n3. Execute a pasta **00 · Fluxo completo** de cima para baixo — ou pelo Collection Runner\n\nA autenticação é da coleção inteira: a requisição de login guarda o token e as demais o herdam. Os endpoints públicos (login e acompanhamento) estão marcados como sem autenticação.\n\n## Organização\n\n- **00 · Fluxo completo** — o ciclo de vida da Ordem de Serviço na ordem em que a oficina trabalha, com verificações automáticas. Inclui os casos negativos que demonstram as regras.\n- **01 a 10** — referência de todos os endpoints, agrupados por recurso e gerados a partir do OpenAPI da própria API.\n\n_Gerada a partir do OpenAPI em 2026-09-01. Para regerar: `node tools/gerar-collection.mjs`._",
+    "description": "# AutoMecanic\n\nSistema Integrado de Atendimento e Execução de Serviços — Tech Challenge Fases 1 e 2, Pós-Tech FIAP 15SOAT.\n\n## Como usar\n\n1. Suba o ambiente: `docker compose up -d --build`\n2. Ajuste a variável `senhaAdmin` para o valor de `SEED_SENHA_ADMIN` do seu `.env`\n3. Execute a pasta **00 · Fluxo completo** de cima para baixo — ou pelo Collection Runner\n\nA autenticação é da coleção inteira: a requisição de login guarda o token e as demais o herdam. Os endpoints públicos (login e acompanhamento) estão marcados como sem autenticação.\n\n## Organização\n\n- **00 · Fluxo completo** — o ciclo de vida da Ordem de Serviço na ordem em que a oficina trabalha, com verificações automáticas. Inclui os casos negativos que demonstram as regras.\n- **00 · Fase 2** — abertura completa com serviços e peças, aprovação e recusa pelo próprio cliente e fila de trabalho priorizada, também com verificações automáticas.\n- **01 a 10** — referência de todos os endpoints, agrupados por recurso e gerados a partir do OpenAPI da própria API.\n\n_Gerada a partir do OpenAPI em 2026-10-25. Para regerar: `node tools/gerar-collection.mjs`._",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -121,6 +121,41 @@
     },
     {
       "key": "saldoAntes",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "saldoAntesF2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "reservadoAntesF2",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "osIdA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "osNumeroA",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "osIdB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "osNumeroB",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "clienteIdF2",
       "value": "",
       "type": "string"
     }
@@ -1252,6 +1287,1065 @@
       ]
     },
     {
+      "name": "00 · Fase 2 — abertura completa, resposta do cliente e fila",
+      "description": "Fluxo da Fase 2, independente da pasta anterior (usa outro cliente e outro veículo).\n\n**A** — a OS é aberta já com serviços e peças, o cliente aprova o orçamento pela rota pública e a fila de trabalho mostra a OS em execução.\n\n**B** — outra OS é aberta, o cliente recusa o orçamento e as reservas voltam ao estoque.\n\nOs e-mails de cada mudança de situação podem ser conferidos no Mailpit (http://localhost:8025).",
+      "item": [
+        {
+          "name": "F2.01 · Login — guarda o token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/autenticacao/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "autenticacao",
+                "login"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{emailAdmin}}\",\n  \"senha\": \"{{senhaAdmin}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Login bem-sucedido\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"token\", pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F2.02 · Catálogo e estoque — guarda serviço e peça",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/servicos?apenasAtivos=true&tamanhoPagina=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "servicos"
+              ],
+              "query": [
+                {
+                  "key": "apenasAtivos",
+                  "value": "true"
+                },
+                {
+                  "key": "tamanhoPagina",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Catálogo disponível\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"servicoId\", pm.response.json().itens[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "F2.03 · Peça escolhida — saldo de partida",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas?apenasAtivas=true&tamanhoPagina=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas"
+              ],
+              "query": [
+                {
+                  "key": "apenasAtivas",
+                  "value": "true"
+                },
+                {
+                  "key": "tamanhoPagina",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Estoque disponível\", () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"pecaId\", pm.response.json().itens[0].id);",
+                  "pm.collectionVariables.set(\"saldoAntesF2\", pm.response.json().itens[0].quantidadeEmEstoque);",
+                  "pm.collectionVariables.set(\"reservadoAntesF2\", pm.response.json().itens[0].quantidadeReservada);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A1 · Recepção completa → 201 com id e número",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/recepcao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "recepcao"
+              ],
+              "query": []
+            },
+            "description": "Cliente, veículo, serviços e peças em uma única chamada e uma única transação. Sem saldo para alguma peça, nada é gravado, nem o número da OS.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentoCliente\": \"529.982.247-25\",\n  \"nomeCliente\": \"Marina Souza\",\n  \"emailCliente\": \"marina.souza@exemplo.com.br\",\n  \"telefoneCliente\": \"(11) 98765-4321\",\n  \"placa\": \"QWE4R56\",\n  \"marca\": \"Honda\",\n  \"modelo\": \"Civic EXL 2.0\",\n  \"anoFabricacao\": 2020,\n  \"anoModelo\": 2020,\n  \"cor\": \"Preto\",\n  \"descricaoProblema\": \"Luz da injeção acesa e marcha lenta irregular.\",\n  \"quilometragemEntrada\": 58000,\n  \"servicos\": [\n    {\n      \"servicoId\": \"{{servicoId}}\",\n      \"quantidade\": 1\n    }\n  ],\n  \"pecas\": [\n    {\n      \"pecaId\": \"{{pecaId}}\",\n      \"quantidade\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"OS aberta\", () => pm.response.to.have.status(201));",
+                  "const os = pm.response.json();",
+                  "pm.test(\"Nasce Recebida\", () => pm.expect(os.status).to.eql(\"Recebida\"));",
+                  "pm.test(\"Veio com o serviço\", () => pm.expect(os.servicos.length).to.eql(1));",
+                  "pm.test(\"Veio com a peça reservada\", () => {",
+                  "    pm.expect(os.pecas.length).to.eql(1);",
+                  "    pm.expect(os.pecas[0].reservada).to.be.true;",
+                  "});",
+                  "pm.test(\"Resposta traz id e número\", () => pm.expect(os.numero).to.match(/^OS-\\d{4}-\\d{6}$/));",
+                  "pm.collectionVariables.set(\"osIdA\", pm.response.json().id);",
+                  "pm.collectionVariables.set(\"osNumeroA\", pm.response.json().numero);",
+                  "pm.collectionVariables.set(\"clienteIdF2\", pm.response.json().clienteId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A2 · Reserva feita, saldo físico intacto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Peça consultada\", () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test(\"Saldo físico intacto\", () =>",
+                  "    pm.expect(p.quantidadeEmEstoque).to.eql(Number(pm.collectionVariables.get(\"saldoAntesF2\"))));",
+                  "pm.test(\"Reservou 2\", () =>",
+                  "    pm.expect(p.quantidadeReservada).to.eql(Number(pm.collectionVariables.get(\"reservadoAntesF2\")) + 2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A3 · Consulta de status (autenticada)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdA}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdA}}",
+                "status"
+              ],
+              "query": []
+            },
+            "description": "Payload enxuto, para painéis e integrações. O cliente usa o acompanhamento público."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status consultado\", () => pm.response.to.have.status(200));",
+                  "const s = pm.response.json();",
+                  "pm.test(\"Situação Recebida e não encerrada\", () => {",
+                  "    pm.expect(s.status).to.eql(\"Recebida\");",
+                  "    pm.expect(s.encerrada).to.be.false;",
+                  "});",
+                  "pm.test(\"Payload leve\", () => pm.expect(Object.keys(s).length).to.be.below(8));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A.1 · Iniciar diagnóstico",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdA}}/diagnostico/iniciar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdA}}",
+                "diagnostico",
+                "iniciar"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Diagnóstico iniciado\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A.2 · Gerar orçamento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdA}}/orcamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdA}}",
+                "orcamento"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"percentualDesconto\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento gerado\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Orçamento tem valor\", () => pm.expect(pm.response.json().orcamento.valorTotal).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A.3 · Enviar ao cliente → Aguardando aprovação",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdA}}/orcamento/enviar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdA}}",
+                "orcamento",
+                "enviar"
+              ],
+              "query": []
+            },
+            "description": "Neste momento a caixa de saída grava o e-mail do orçamento, com o número da OS e as instruções de aprovação. Em desenvolvimento, ele aparece no Mailpit (http://localhost:8025).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validadeEmDias\": 7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento enviado\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status Aguardando aprovação\", () =>",
+                  "    pm.expect(pm.response.json().status).to.eql(\"AguardandoAprovacao\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A4 · Cliente aprova pela rota pública → Em execução",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento/orcamento/aprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento",
+                "orcamento",
+                "aprovar"
+              ],
+              "query": []
+            },
+            "description": "Sem autenticação: o número da OS (enviado por e-mail) e o CPF identificam o titular.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"{{osNumeroA}}\",\n  \"documento\": \"52998224725\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento aprovado pelo cliente\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"OS em execução\", () => pm.expect(pm.response.json().status).to.eql(\"EmExecucao\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A5 · Aprovar de novo → 422",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento/orcamento/aprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento",
+                "orcamento",
+                "aprovar"
+              ],
+              "query": []
+            },
+            "description": "O orçamento já foi respondido: a segunda tentativa é recusada e nada muda.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"{{osNumeroA}}\",\n  \"documento\": \"52998224725\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Segunda aprovação recusada\", () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A6 · Documento de terceiro → 404, igual a OS inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento/orcamento/aprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento",
+                "orcamento",
+                "aprovar"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"{{osNumeroA}}\",\n  \"documento\": \"11144477735\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Resposta idêntica à de OS inexistente\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A7 · Peças baixadas do estoque",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Peça consultada\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Saldo reduzido em 2\", () =>",
+                  "    pm.expect(pm.response.json().quantidadeEmEstoque).to.eql(Number(pm.collectionVariables.get(\"saldoAntesF2\")) - 2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A8 · Fila priorizada — só o que está em andamento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico?tamanhoPagina=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico"
+              ],
+              "query": [
+                {
+                  "key": "tamanhoPagina",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "Ordem: Em execução, Aguardando aprovação, Em diagnóstico, Recebida; dentro de cada situação, as mais antigas primeiro. Finalizadas, entregues e canceladas ficam de fora."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Fila disponível\", () => pm.response.to.have.status(200));",
+                  "const itens = pm.response.json().itens;",
+                  "const prioridade = {\"EmExecucao\":1,\"AguardandoAprovacao\":2,\"EmDiagnostico\":3,\"Recebida\":4};",
+                  "pm.test(\"Nenhuma OS encerrada na fila\", () =>",
+                  "    itens.forEach(i => pm.expect(prioridade).to.have.property(i.status)));",
+                  "pm.test(\"Situações em ordem de prioridade\", () => {",
+                  "    for (let i = 1; i < itens.length; i++) {",
+                  "        pm.expect(prioridade[itens[i - 1].status]).to.be.at.most(prioridade[itens[i].status]);",
+                  "    }",
+                  "});",
+                  "pm.test(\"Mais antigas primeiro dentro da situação\", () => {",
+                  "    for (let i = 1; i < itens.length; i++) {",
+                  "        if (itens[i - 1].status === itens[i].status) {",
+                  "            pm.expect(new Date(itens[i - 1].criadaEm) <= new Date(itens[i].criadaEm)).to.be.true;",
+                  "        }",
+                  "    }",
+                  "});",
+                  "pm.test(\"A OS aprovada está na fila\", () =>",
+                  "    pm.expect(itens.some(i => i.id === pm.collectionVariables.get(\"osIdA\"))).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A9 · Finalizar o serviço",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdA}}/finalizar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdA}}",
+                "finalizar"
+              ],
+              "query": []
+            },
+            "description": "Finalizar e entregar deixam o veículo livre para a pasta poder ser repetida.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observacao\": \"Serviço concluído.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"OS finalizada\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "A10 · Entregar o veículo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdA}}/entregar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdA}}",
+                "entregar"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"observacao\": \"Retirado pelo cliente.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Veículo entregue\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status Entregue\", () => pm.expect(pm.response.json().status).to.eql(\"Entregue\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B1 · Nova OS completa, com outra placa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/recepcao",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "recepcao"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentoCliente\": \"529.982.247-25\",\n  \"nomeCliente\": \"Marina Souza\",\n  \"emailCliente\": \"marina.souza@exemplo.com.br\",\n  \"telefoneCliente\": \"(11) 98765-4321\",\n  \"placa\": \"RTY7U89\",\n  \"marca\": \"Honda\",\n  \"modelo\": \"Civic EXL 2.0\",\n  \"anoFabricacao\": 2020,\n  \"anoModelo\": 2020,\n  \"cor\": \"Preto\",\n  \"descricaoProblema\": \"Barulho na suspensão traseira.\",\n  \"quilometragemEntrada\": 58000,\n  \"servicos\": [\n    {\n      \"servicoId\": \"{{servicoId}}\",\n      \"quantidade\": 1\n    }\n  ],\n  \"pecas\": [\n    {\n      \"pecaId\": \"{{pecaId}}\",\n      \"quantidade\": 2\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"OS aberta\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"osIdB\", pm.response.json().id);",
+                  "pm.collectionVariables.set(\"osNumeroB\", pm.response.json().numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B.1 · Iniciar diagnóstico",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdB}}/diagnostico/iniciar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdB}}",
+                "diagnostico",
+                "iniciar"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Diagnóstico iniciado\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B.2 · Gerar orçamento",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdB}}/orcamento",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdB}}",
+                "orcamento"
+              ],
+              "query": []
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"percentualDesconto\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento gerado\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Orçamento tem valor\", () => pm.expect(pm.response.json().orcamento.valorTotal).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B.3 · Enviar ao cliente → Aguardando aprovação",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osIdB}}/orcamento/enviar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osIdB}}",
+                "orcamento",
+                "enviar"
+              ],
+              "query": []
+            },
+            "description": "Neste momento a caixa de saída grava o e-mail do orçamento, com o número da OS e as instruções de aprovação. Em desenvolvimento, ele aparece no Mailpit (http://localhost:8025).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"validadeEmDias\": 7\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento enviado\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status Aguardando aprovação\", () =>",
+                  "    pm.expect(pm.response.json().status).to.eql(\"AguardandoAprovacao\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B2 · Cliente recusa pela rota pública → Cancelada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento/orcamento/reprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento",
+                "orcamento",
+                "reprovar"
+              ],
+              "query": []
+            },
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"{{osNumeroB}}\",\n  \"documento\": \"52998224725\",\n  \"motivo\": \"Valor acima do esperado.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Orçamento recusado pelo cliente\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"OS cancelada\", () => pm.expect(pm.response.json().status).to.eql(\"Cancelada\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B3 · Reservas devolvidas ao estoque",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/pecas/{{pecaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "pecas",
+                "{{pecaId}}"
+              ],
+              "query": []
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Peça consultada\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Nenhuma reserva pendente da OS recusada\", () =>",
+                  "    pm.expect(pm.response.json().quantidadeReservada).to.eql(Number(pm.collectionVariables.get(\"reservadoAntesF2\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "B4 · A OS cancelada sai da fila, mas está no histórico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico?incluirEncerradas=true&clienteId={{clienteIdF2}}&tamanhoPagina=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico"
+              ],
+              "query": [
+                {
+                  "key": "incluirEncerradas",
+                  "value": "true"
+                },
+                {
+                  "key": "clienteId",
+                  "value": "{{clienteIdF2}}"
+                },
+                {
+                  "key": "tamanhoPagina",
+                  "value": "100"
+                }
+              ]
+            },
+            "description": "`incluirEncerradas=true` traz o histórico (finalizadas, entregues e canceladas)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Histórico disponível\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"A OS recusada aparece no histórico\", () =>",
+                  "    pm.expect(pm.response.json().itens.some(i => i.id === pm.collectionVariables.get(\"osIdB\") && i.status === \"Cancelada\")).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "01 · Autenticação",
       "description": "Todas as operações de Autenticacao, geradas a partir do OpenAPI.",
       "item": [
@@ -1335,6 +2429,88 @@
             "description": "Consulta a situação de uma Ordem de Serviço.\n\n\nO endpoint é anônimo, mas exige <b>número da OS e documento do cliente juntos</b>: os dois\n            funcionam como prova de posse. Sem essa combinação, seria possível percorrer números\n            sequenciais de OS e ler dados de outros clientes.\n\nA resposta é idêntica para \"OS inexistente\" e \"documento não confere\" — distingui-las\n            permitiria descobrir quais números de OS existem.\n\nA visão é reduzida de propósito: não expõe responsável técnico, custo individual de peça\n            nem identificadores internos. O orçamento só aparece depois de enviado ao cliente.",
             "auth": {
               "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/acompanhamento/orcamento/aprovar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento/orcamento/aprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento",
+                "orcamento",
+                "aprovar"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "O cliente aprova o orçamento recebido.\n\nMesmo efeito da aprovação registrada pelo atendente. Responder de novo a um orçamento já\nrespondido é recusado com `422`, sem alterar nada.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"1500\",\n  \"documento\": \"111.444.777-35\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST /api/v1/acompanhamento/orcamento/reprovar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/acompanhamento/orcamento/reprovar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "acompanhamento",
+                "orcamento",
+                "reprovar"
+              ],
+              "query": [],
+              "variable": []
+            },
+            "description": "O cliente recusa o orçamento recebido.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"numero\": \"1500\",\n  \"documento\": \"111.444.777-35\",\n  \"motivo\": \"Justificativa da operação.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             }
           },
           "response": []
@@ -1436,7 +2612,7 @@
                 {
                   "key": "status",
                   "value": "",
-                  "description": "Restringe a uma situação.",
+                  "description": "Restringe a uma situação. Informada, vale mesmo para as encerradas.",
                   "disabled": true
                 },
                 {
@@ -1480,11 +2656,17 @@
                   "value": "",
                   "description": "Quantidade de registros a pular na consulta.",
                   "disabled": true
+                },
+                {
+                  "key": "incluirEncerradas",
+                  "value": "",
+                  "description": "Inclui finalizadas, entregues e canceladas. Padrão: `false`.",
+                  "disabled": true
                 }
               ],
               "variable": []
             },
-            "description": "Lista Ordens de Serviço com filtros e paginação."
+            "description": "Fila de trabalho: Ordens de Serviço por prioridade de atendimento, das mais antigas para\nas mais novas dentro de cada situação.\n\nOrdem: <b>Em execução</b>, <b>Aguardando aprovação</b>, <b>Em diagnóstico</b> e <b>Recebida</b>;\ndentro de cada situação, a OS mais antiga primeiro. Finalizadas, entregues e canceladas\nsaem da listagem por padrão — a exclusão é só da fila, nenhuma OS é apagada — e aparecem\nao final com `incluirEncerradas=true`."
           },
           "response": []
         },
@@ -1514,6 +2696,36 @@
               ]
             },
             "description": "Detalha uma OS, com itens, orçamento e linha do tempo."
+          },
+          "response": []
+        },
+        {
+          "name": "GET /api/v1/ordens-servico/{id}/status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ordens-servico/{{osId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "ordens-servico",
+                "{{osId}}",
+                "status"
+              ],
+              "query": [],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{osId}}",
+                  "description": "Identificador da OS."
+                }
+              ]
+            },
+            "description": "Informa a situação atual de uma OS, sem itens nem orçamento.\n\nResposta enxuta para painéis e integrações que só precisam acompanhar a etapa da OS. O\ncliente, sem autenticação, consulta a situação por `GET /api/v1/acompanhamento`."
           },
           "response": []
         },
@@ -2195,7 +3407,7 @@
               "query": [],
               "variable": []
             },
-            "description": "Expira orçamentos vencidos e cancela as respectivas Ordens de Serviço.\n\nRotina de manutenção, destinada a ser acionada por um agendador. Libera as reservas\nde peça presas em orçamentos que o cliente nunca respondeu."
+            "description": "Expira orçamentos vencidos e cancela as respectivas Ordens de Serviço.\n\nRotina de manutenção que libera as reservas de peça presas em orçamentos que o cliente\nnunca respondeu. No Kubernetes, ela roda pelo CronJob (`--expirar-orcamentos`);\neste endpoint permite o acionamento manual."
           },
           "response": []
         },
@@ -2223,10 +3435,10 @@
               "query": [],
               "variable": []
             },
-            "description": "Recepção do veículo no balcão: identifica o cliente pelo CPF/CNPJ, localiza ou cadastra\no veículo pela placa e abre a OS — tudo em uma única transação.\n\nCliente e veículo são cadastrados automaticamente quando ainda não existem — nesse caso,\nos dados de contato e as informações do veículo passam a ser obrigatórios.",
+            "description": "Abertura completa da OS: identifica o cliente pelo CPF/CNPJ, localiza ou cadastra o\nveículo pela placa, abre a OS e inclui os serviços e as peças informados — tudo em uma\núnica transação.\n\nCliente e veículo são cadastrados automaticamente quando ainda não existem — nesse caso,\nos dados de contato e as informações do veículo passam a ser obrigatórios.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"documentoCliente\": \"111.444.777-35\",\n  \"nomeCliente\": \"Carlos Andrade\",\n  \"emailCliente\": \"carlos.andrade@exemplo.com.br\",\n  \"telefoneCliente\": \"(11) 91234-5678\",\n  \"placa\": \"JKL5M67\",\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla XEi 2.0\",\n  \"anoFabricacao\": 2021,\n  \"anoModelo\": 2022,\n  \"cor\": \"Prata\",\n  \"descricaoProblema\": \"Ruído metálico ao frear em baixa velocidade.\",\n  \"quilometragemEntrada\": 42000\n}",
+              "raw": "{\n  \"documentoCliente\": \"111.444.777-35\",\n  \"nomeCliente\": \"Carlos Andrade\",\n  \"emailCliente\": \"carlos.andrade@exemplo.com.br\",\n  \"telefoneCliente\": \"(11) 91234-5678\",\n  \"placa\": \"JKL5M67\",\n  \"marca\": \"Toyota\",\n  \"modelo\": \"Corolla XEi 2.0\",\n  \"anoFabricacao\": 2021,\n  \"anoModelo\": 2022,\n  \"cor\": \"Prata\",\n  \"descricaoProblema\": \"Ruído metálico ao frear em baixa velocidade.\",\n  \"quilometragemEntrada\": 42000,\n  \"servicos\": [\n    {\n      \"servicoId\": \"00000000-0000-0000-0000-000000000000\",\n      \"quantidade\": 1\n    }\n  ],\n  \"pecas\": [\n    {\n      \"pecaId\": \"00000000-0000-0000-0000-000000000000\",\n      \"quantidade\": 1\n    }\n  ]\n}",
               "options": {
                 "raw": {
                   "language": "json"

@@ -1,0 +1,53 @@
+# Cluster na AWS (EKS): imagem do ECR, banco no RDS, e-mail pelo Gmail, entrada por um NLB.
+#
+# O Secret NÃO está aqui: é criado pelo script aplicar.sh (ou pelo CD) a partir dos outputs do
+# Terraform e dos segredos do GitHub. Ver README.md desta pasta.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: automecanic
+
+resources:
+  - ../../base
+
+# Os dois valores abaixo são substituídos por aplicar.sh no momento do deploy (conta e tag reais).
+images:
+  - name: automecanic-api
+    newName: 000000000000.dkr.ecr.us-east-1.amazonaws.com/automecanic-api
+    newTag: substituir
+
+patches:
+  - target:
+      kind: ConfigMap
+      name: automecanic-api
+    patch: |-
+      # Um NLB trabalha na camada 4 e NÃO acrescenta X-Forwarded-For. Confiar nesse cabeçalho
+      # deixaria qualquer cliente forjar o IP e escapar do limite de taxa. Com a política Local
+      # do Service (abaixo), a API já enxerga o IP verdadeiro do cliente.
+      - op: replace
+        path: /data/Hospedagem__UsarCabecalhosEncaminhados
+        value: "false"
+      # Dados de demonstração para a apresentação (clientes, veículos, peças e OS de exemplo).
+      - op: replace
+        path: /data/Seed__IncluirDadosDeDemonstracao
+        value: "true"
+
+  - target:
+      kind: Service
+      name: automecanic-api
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: LoadBalancer
+      # Local: o balanceador só envia tráfego a nós que têm uma réplica, e o IP de origem do
+      # cliente é preservado (sem isso, a API veria o IP do nó e o limite de taxa por IP seria
+      # compartilhado por todos os clientes).
+      - op: add
+        path: /spec/externalTrafficPolicy
+        value: Local
+      - op: add
+        path: /metadata/annotations
+        value:
+          # NLB em vez do balanceador clássico, que é o padrão e custa mais.
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+          service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"

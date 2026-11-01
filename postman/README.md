@@ -1,7 +1,7 @@
 # Coleção Postman
 
-Coleção completa da API do AutoMecanic: **98 requisições** cobrindo todos os 73 endpoints,
-mais um fluxo guiado com verificações automáticas.
+Coleção completa da API do AutoMecanic: **124 requisições** cobrindo todos os 76 endpoints,
+mais dois fluxos guiados com verificações automáticas.
 
 | Arquivo | O que é |
 |---|---|
@@ -55,6 +55,25 @@ Inclui os casos negativos que demonstram as regras do domínio:
 | `20 · Entregar sem finalizar → 422` | Não há caminho para *Entregue* sem passar por *Finalizada* |
 | `23 · Cancelar OS entregue → 422` | Estado terminal não admite transições |
 
+### `00 · Fase 2 — abertura completa, resposta do cliente e fila` — 23 requisições
+
+Fluxo independente do anterior (outro cliente e outro veículo), com **45 asserções**, que cobre as
+APIs da Fase 2:
+
+| Requisição | Demonstra |
+|---|---|
+| `A1 · Recepção completa → 201` | Cliente, veículo, serviços e peças em uma transação, com reserva de estoque |
+| `A3 · Consulta de status` | `GET /ordens-servico/{id}/status`, payload leve |
+| `A4 · Cliente aprova pela rota pública` | Aprovação sem token, por número da OS + CPF |
+| `A5 · Aprovar de novo → 422` | Uma resposta ao orçamento não se repete |
+| `A6 · Documento de terceiro → 404` | Resposta idêntica à de OS inexistente |
+| `A8 · Fila priorizada` | Em execução > Aguardando aprovação > Em diagnóstico > Recebida; encerradas fora |
+| `B2 · Cliente recusa → Cancelada` e `B3` | Recusa pública e devolução das reservas ao estoque |
+| `B4 · Histórico` | `incluirEncerradas=true` traz a OS cancelada |
+
+Cada mudança de situação gera um e-mail para o cliente; em desenvolvimento eles aparecem no
+Mailpit, em http://localhost:8025.
+
 ### `01` a `10` — referência por recurso
 
 Todos os endpoints, agrupados por recurso, **gerados a partir do OpenAPI da própria API**.
@@ -73,7 +92,16 @@ npx newman run postman/AutoMecanic.postman_collection.json \
   --env-var "senhaAdmin=SUA_SENHA_DO_ENV"
 ```
 
-Resultado esperado: **25 requisições, 51 asserções, 0 falhas.**
+E a pasta da Fase 2:
+
+```bash
+npx newman run postman/AutoMecanic.postman_collection.json \
+  --folder "00 · Fase 2 — abertura completa, resposta do cliente e fila" \
+  --env-var "senhaAdmin=SUA_SENHA_DO_ENV"
+```
+
+Resultado esperado: **25 requisições e 51 asserções** no fluxo completo, **23 requisições e
+45 asserções** na Fase 2, **0 falhas** nas duas. Ambas podem ser repetidas à vontade.
 
 É exatamente isso que o job `ambiente-completo` do CI executa a cada push, o que impede a
 coleção de envelhecer em silêncio.
