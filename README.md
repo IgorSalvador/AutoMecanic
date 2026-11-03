@@ -3,13 +3,47 @@
 **Sistema Integrado de Atendimento e Execução de Serviços** — back-end de gestão para uma
 oficina mecânica de médio porte.
 
-> Tech Challenge · Fase 1 — Pós-Tech FIAP, turma 15SOAT
+> Tech Challenge · Fase 2 — Pós-Tech FIAP, turma 15SOAT
 
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-336791)](https://www.postgresql.org/)
 [![Testes](https://img.shields.io/badge/testes-598%20verdes-success)]()
 [![Cobertura](https://img.shields.io/badge/cobertura-92.2%25-success)]()
 [![Vulnerabilidades](https://img.shields.io/badge/CVEs%20cr%C3%ADticas%2Faltas-0-success)]()
+
+---
+
+## Fase 2 em resumo
+
+Na Fase 1 a oficina ganhou um sistema de gestão que rodava em um único `docker compose`. Com a
+expansão para novas unidades e os picos de demanda, a Fase 2 leva a mesma aplicação para um
+ambiente **escalável, automatizado e reproduzível**:
+
+| Objetivo da fase | O que foi entregue | Onde |
+|---|---|---|
+| Reduzir riscos operacionais com infraestrutura escalável | Kubernetes (EKS na AWS e kind localmente): 2 a 6 réplicas sob HPA por CPU e memória, sondas de saúde e PodDisruptionBudget | [`k8s/`](k8s/) |
+| Automatizar o provisionamento e o deploy | Terraform em três camadas (estado, base e cluster) e pipeline de CD no GitHub Actions, sem chave de acesso guardada (OIDC) | [`infra/`](infra/) · [`.github/workflows/`](.github/workflows/) |
+| Melhorar a qualidade e a organização do código | Clean Architecture, com a regra de dependência verificada por testes de arquitetura, e 598 testes automatizados | [`src/`](src/) · [`tests/`](tests/) |
+| Suportar picos de ordens de serviço | Escalabilidade dinâmica pelo HPA, migração como Job, e-mails por caixa de saída (*outbox*) que sobrevive à remoção de réplicas e limites de taxa | [`k8s/base`](k8s/base/) · [ADRs](docs/05-arquitetura.md) |
+
+**APIs da fase**
+
+| Requisito | Endpoint |
+|---|---|
+| Abertura de OS (cliente, veículo, serviços e peças), devolvendo a identificação única | `POST /api/v1/ordens-servico/recepcao` |
+| Consulta de status da OS | `GET /api/v1/ordens-servico/{id}/status` · `GET /api/v1/acompanhamento` (cliente) |
+| Aprovação ou recusa do orçamento pelo cliente | `POST /api/v1/acompanhamento/orcamento/aprovar` · `/reprovar` |
+| Listagem priorizada (Em execução > Aguardando aprovação > Em diagnóstico > Recebida; mais antigas primeiro; encerradas fora da fila, sem apagar nada) | `GET /api/v1/ordens-servico` |
+| Atualização de status por e-mail | O cliente recebe um e-mail a cada mudança de situação da OS ([detalhes](#e-mails-ao-cliente)) |
+
+**Links**
+
+| Item | Onde |
+|---|---|
+| Repositório | https://github.com/IgorSalvador/AutoMecanic |
+| **Collection das APIs (Postman)** | [`postman/`](postman/README.md): 124 requisições, todos os 76 endpoints, com verificações automáticas |
+| Documentação interativa (Swagger) | `/swagger` em qualquer ambiente (local: http://localhost:8080/swagger) |
+| **Vídeo demonstrativo** (até 15 min) | 🎬 **A PREENCHER:** colar aqui o link do YouTube/Vimeo depois da gravação |
 
 ---
 
@@ -28,7 +62,10 @@ planilhas**. O resultado eram cinco problemas concretos, e o sistema responde a 
 
 ---
 
-## Subindo o ambiente
+## Execução local (Docker Compose)
+
+A forma mais simples de rodar tudo na própria máquina. Para o cluster Kubernetes local, veja
+[Deploy em Kubernetes](#deploy-em-kubernetes); para a nuvem, [Provisionamento com Terraform](#provisionamento-com-terraform).
 
 **Pré-requisito único:** Docker com Compose. Nada mais precisa estar instalado.
 
@@ -156,8 +193,9 @@ do estoque**. Ou `POST .../orcamento/reprovar` → a OS é cancelada e as **rese
 
 Todas as requisições acima estão prontas em duas formas:
 
-- **[Coleção Postman](postman/)** — 98 requisições, com o fluxo guiado e 51 verificações
-  automáticas. Importe os dois arquivos de `postman/` e execute a pasta *00 · Fluxo completo*.
+- **[Coleção Postman](postman/)** — 124 requisições cobrindo os 76 endpoints, com dois fluxos
+  guiados e 96 verificações automáticas. Importe os dois arquivos de `postman/` e execute as
+  pastas *00 · Fluxo completo* e *00 · Fase 2*.
 - **[`AutoMecanic.http`](AutoMecanic.http)** — para quem prefere não sair do editor, com a
   extensão *REST Client* do VS Code.
 
@@ -198,12 +236,139 @@ peças são baixadas. Documento que não confere recebe a mesma resposta de OS i
 | [Guia de testes](docs/07-guia-de-testes.md) | Como testar tudo: testes automatizados, compose, Kubernetes local, HPA e roteiro da AWS |
 | [AWS do zero](docs/08-guia-aws-do-zero.md) | Passo a passo para quem nunca usou nuvem: conta, MFA, alarmes de custo, usuários, CLI e Terraform |
 | [Deploy na AWS (CI/CD)](docs/09-guia-cd-aws.md) | Configurar o GitHub e a AWS, rodar o deploy e, em cada etapa, como desligar para não gerar custo |
+| [Plano da Fase 2](docs/fase2/plano-de-implementacao.md) | Decisões, tarefas e situação da evolução para Kubernetes, Terraform e CI/CD |
 | [Documento de entrega](docs/ENTREGA.md) | Modelo para exportação em PDF |
 | [Coleção Postman](postman/README.md) | Como importar, executar e regerar a coleção |
 
 ---
 
-## Arquitetura
+## Arquitetura da solução
+
+Três visões da mesma solução: os componentes da aplicação, a infraestrutura provisionada na AWS
+e o caminho do código até o cluster.
+
+### Componentes da aplicação
+
+A imagem Docker é única e tem três modos de execução: a **API** (que também roda o envio de
+e-mails em segundo plano), o **Job de migração** (`--migrar`) e o **CronJob** que expira orçamentos
+vencidos (`--expirar-orcamentos`). Todos usam o mesmo PostgreSQL.
+
+```mermaid
+flowchart TB
+    Cliente(["Cliente<br/>acompanha a OS e responde ao orçamento"])
+    Equipe(["Atendente e administrador<br/>JWT"])
+
+    subgraph K8S["Cluster Kubernetes · namespace automecanic"]
+        SVC["Service<br/>NLB na AWS · NodePort no kind"]
+        subgraph DEPL["Deployment da API · 2 a 6 réplicas, escaladas pelo HPA"]
+            Api["Api<br/>controladores, JWT, Swagger"]
+            App["Application<br/>casos de uso e portas"]
+            Dom["Domain<br/>agregados e regras, sem dependências"]
+            Infra["Infrastructure<br/>EF Core, caixa de saída, SMTP"]
+            Api --> App --> Dom
+            Infra -. "implementa as portas" .-> App
+        end
+        MIG["Job de migração<br/>--migrar"]
+        CRON["CronJob de expiração<br/>--expirar-orcamentos"]
+        CFG["ConfigMap e Secret"]
+    end
+
+    DB[("PostgreSQL 17<br/>RDS na AWS · StatefulSet no kind")]
+    SMTP["Servidor SMTP<br/>Gmail na AWS · Mailpit no kind"]
+
+    Cliente -->|"HTTP"| SVC
+    Equipe -->|"HTTP"| SVC
+    SVC --> Api
+    Infra --> DB
+    MIG --> DB
+    CRON --> DB
+    Infra -->|"e-mails de mudança de situação"| SMTP
+    CFG -.-> DEPL
+```
+
+### Infraestrutura provisionada na AWS
+
+Criada pelo Terraform (três camadas) e pelo Kubernetes (o balanceador). Tudo em `us-east-1`.
+
+```mermaid
+flowchart TB
+    Usuario(["Usuário, Newman e Postman"])
+    Gmail["Gmail<br/>SMTP, porta 587"]
+    GH["GitHub Actions<br/>CI e CD"]
+
+    subgraph AWS["AWS · us-east-1"]
+        subgraph VPC["VPC 10.0.0.0/16 · 2 zonas de disponibilidade · sem NAT Gateway"]
+            subgraph PUB["Subnets públicas"]
+                NLB["Network Load Balancer<br/>criado pelo Service do Kubernetes"]
+                subgraph EKS["EKS 1.36 · camada 20-cluster"]
+                    NOS["2 nós t3.medium"]
+                    PODS["Pods da API<br/>HPA de 2 a 6 réplicas"]
+                    NOS --- PODS
+                end
+            end
+            subgraph PRIV["Subnets privadas"]
+                RDS[("RDS PostgreSQL 17<br/>db.t4g.micro · sem acesso público")]
+            end
+        end
+        ECR["ECR<br/>imagens da API"]
+        S3["S3<br/>estado do Terraform · camada 00-bootstrap"]
+        IAM["Provedor OIDC e papel do CI<br/>camada 10-base"]
+        BUD["AWS Budgets<br/>alarmes de gasto"]
+    end
+
+    Usuario -->|"HTTP :80"| NLB --> PODS
+    PODS -->|"5432"| RDS
+    PODS -->|"587"| Gmail
+    NOS -->|"puxam a imagem"| ECR
+    GH -->|"token OIDC, sem chave de acesso"| IAM
+    GH -->|"publica a imagem"| ECR
+    GH -->|"terraform e kubectl"| EKS
+    GH -.->|"guarda o estado"| S3
+```
+
+| Camada do Terraform | Recursos | Muda com frequência? |
+|---|---|---|
+| `infra/00-bootstrap` | Bucket S3 do estado (versionado, criptografado, sem acesso público) | Nunca |
+| `infra/10-base` | VPC, ECR, RDS, provedor OIDC e papel do CI, alarmes de gasto | Raramente (fica de pé) |
+| `infra/20-cluster` | EKS, grupo de nós, add-ons e acessos | **Criada e destruída sob demanda** |
+
+### Fluxo de deploy
+
+O CI valida cada PR; o CD só roda na `main` (ou à mão), depois de uma **aprovação manual**. Um
+workflow agendado destrói o cluster toda madrugada para não gerar custo.
+
+```mermaid
+flowchart LR
+    DEV["Push ou PR"] --> CI
+
+    subgraph CI["CI · cada PR e push"]
+        direction TB
+        C1["Compilação e testes"]
+        C2["Manifestos<br/>kustomize + kubeconform"]
+        C3["Terraform<br/>fmt, init e validate"]
+        C4["Análise de vulnerabilidades"]
+        C5["Ambiente completo em contêiner<br/>e coleção no Newman"]
+    end
+
+    CI -->|"merge na main"| CD
+
+    subgraph CD["CD · main ou disparo manual"]
+        direction TB
+        D0["Testes"] --> D1["Aprovação manual<br/>environment aws"]
+        D1 --> D2["Login na AWS por OIDC"]
+        D2 --> D3["Terraform 10-base<br/>rede, ECR e RDS"]
+        D3 --> D4["Build e push da imagem<br/>tag do commit"]
+        D4 --> D5["Terraform 20-cluster<br/>EKS"]
+        D5 --> D6["Job de migração e<br/>kubectl apply -k overlays/aws"]
+        D6 --> D7["Teste de fumaça<br/>Newman no endereço público"]
+    end
+
+    CD -.-> DES["Destruir cluster<br/>03:00 de Brasília ou à mão"]
+```
+
+---
+
+## Arquitetura da aplicação (camadas)
 
 Monolito em camadas, com a **regra de dependência apontando para dentro**:
 
@@ -284,25 +449,125 @@ dependências .NET. [Relatório completo](docs/06-relatorio-de-seguranca.md).
 
 ---
 
-## Kubernetes local (kind)
+## Deploy em Kubernetes
 
-Os mesmos manifestos que irão para a nuvem rodam num cluster [kind](https://kind.sigs.k8s.io):
-API com 2 a 6 réplicas sob HPA, Job de migração, CronJob de expiração de orçamentos,
-PostgreSQL e Mailpit. Requisitos: Docker, `kind` e `kubectl`.
+Os manifestos usam [Kustomize](https://kustomize.io): um `base` comum e um *overlay* por
+ambiente, de modo que o cluster local e o da AWS rodam os mesmos recursos.
+
+```
+k8s/
+├── base/               recursos comuns a qualquer cluster
+└── overlays/
+    ├── local/          kind: PostgreSQL, Mailpit e metrics-server dentro do cluster
+    │   └── carga/      teste de carga (k6) para demonstrar o HPA
+    └── aws/            EKS: imagem do ECR, banco no RDS, e-mail pelo Gmail, entrada por NLB
+```
+
+| Recurso (`k8s/base`) | Detalhes |
+|---|---|
+| **Deployment** | 2 réplicas no mínimo; *requests* e *limits*; sondas de inicialização, vivacidade (`/health/vivo`) e prontidão (`/health/pronto`); `runAsNonRoot`, sem escalonamento de privilégio e sem *capabilities* |
+| **Service** | `ClusterIP` no base; `NodePort` no kind; `LoadBalancer` (NLB) na AWS |
+| **ConfigMap e Secret** | Configuração em variáveis de ambiente. Valores sensíveis (cadeia do banco, chave JWT, senha do admin, credenciais SMTP) ficam no **Secret**, criado fora do git; `secret.modelo.yaml` documenta as chaves |
+| **HPA** | `autoscaling/v2`, alvo de 70% de CPU e 80% de memória, de 2 a 6 réplicas |
+| **PodDisruptionBudget** | Mantém pelo menos uma réplica durante manutenções dos nós |
+| **Job de migração** | Aplica as migrações e a carga inicial antes de a API subir (várias réplicas não migram ao mesmo tempo) |
+| **CronJob** | Expira os orçamentos vencidos e devolve as reservas de peça ao estoque |
+
+### Em um cluster local (kind)
+
+Requisitos: Docker, [`kind`](https://kind.sigs.k8s.io) e `kubectl`.
 
 ```powershell
 .\k8s\overlays\local\subir-cluster.ps1            # Windows (no Linux/macOS: ./subir-cluster.sh)
 .\k8s\overlays\local\subir-cluster.ps1 -Destruir  # remove o cluster
 ```
 
-API e Swagger em http://localhost:8080, Mailpit em http://localhost:8025. Para ver o HPA
-escalar, aplique o teste de carga e acompanhe as réplicas:
+O script cria o cluster, constrói e carrega a imagem, aplica os manifestos e espera a migração.
+API e Swagger em http://localhost:8080, Mailpit em http://localhost:8025.
+
+**Escalabilidade automática.** Para ver o HPA escalar, aplique o teste de carga (k6, até 40
+usuários virtuais) e acompanhe as réplicas:
 
 ```bash
 kubectl apply -k k8s/overlays/local/carga
 kubectl -n automecanic get hpa -w
 kubectl delete -k k8s/overlays/local/carga     # limpa e permite repetir
 ```
+
+### Na AWS (EKS)
+
+O caminho normal é o [pipeline de CD](#pipeline-de-cicd), que faz tudo sozinho. Para aplicar à
+mão, com as camadas `10-base` e `20-cluster` já criadas, veja o passo a passo (variáveis,
+`DRY_RUN` e como desligar) em [`k8s/overlays/aws/README.md`](k8s/overlays/aws/README.md):
+
+```bash
+aws eks update-kubeconfig --region us-east-1 --name automecanic
+./k8s/overlays/aws/aplicar.sh     # Secret, migração, manifestos e espera do balanceador
+```
+
+> ⚠️ A demonstração na AWS atende **só em HTTP** (sem domínio nem certificado) e o endereço do
+> balanceador muda a cada vez que o cluster é recriado.
+
+---
+
+## Provisionamento com Terraform
+
+Três camadas independentes em [`infra/`](infra/README.md), aplicadas **nesta ordem** e destruídas
+na ordem inversa. O estado fica em um bucket S3 (com trava nativa, sem DynamoDB).
+
+| Camada | O que cria | Custo ligada |
+|---|---|---|
+| [`00-bootstrap`](infra/00-bootstrap/README.md) | Bucket S3 do estado: versionado, criptografado, sem acesso público | centavos/mês |
+| [`10-base`](infra/10-base/README.md) | VPC em 2 zonas (sem NAT), ECR, RDS PostgreSQL 17, provedor OIDC e papel do CI, alarmes de gasto | ~US$ 0,02/h |
+| [`20-cluster`](infra/20-cluster/README.md) | EKS 1.36 (2 nós `t3.medium`), add-ons e acessos | ~US$ 0,20/h, mais ~US$ 0,025/h do balanceador |
+
+**Requisitos:** [Terraform](https://developer.hashicorp.com/terraform) 1.10+, AWS CLI e uma conta
+AWS com credenciais configuradas (o [guia AWS do zero](docs/08-guia-aws-do-zero.md) cobre conta,
+MFA, alarmes de custo e usuários).
+
+```bash
+# 1 · uma vez: bucket do estado
+cd infra/00-bootstrap && terraform init && terraform apply
+
+# 2 · rede, ECR, banco e papel do CI (informe os e-mails dos alarmes em terraform.tfvars)
+cd ../10-base && terraform init && terraform apply
+
+# 3 · o cluster (cria e destrói sob demanda)
+cd ../20-cluster && terraform init && terraform apply
+```
+
+O `00-bootstrap` tem um passo extra, depois de criado o bucket: migrar o próprio estado para ele
+(`backend.tf`). O `10-base` e o `20-cluster` leem um `terraform.tfvars` (fora do git; há um
+`terraform.tfvars.exemplo` em cada pasta). Cada README de camada traz esses passos, as
+verificações e **como desligar**. Para destruir, siga
+a ordem inversa: primeiro a aplicação e o balanceador (criado pelo Kubernetes, não pelo
+Terraform), depois `20-cluster`, e `10-base` só se for ficar dias sem usar.
+
+> ⚠️ **Tudo ligado custa ~US$ 0,25 por hora (~US$ 185 por mês).** O cluster é o item caro: o
+> workflow **Destruir cluster** o remove toda madrugada, e a operação manual está no
+> [guia de CD](docs/09-guia-cd-aws.md#passo-6--desligar).
+
+---
+
+## Pipeline de CI/CD
+
+Três workflows em [`.github/workflows/`](.github/workflows/):
+
+| Workflow | Quando roda | O que faz |
+|---|---|---|
+| **`ci.yml`** | Push e PR | Compilação e testes; validação dos manifestos (`kustomize` + `kubeconform`); `terraform fmt`, `init` e `validate` das três camadas; análise de vulnerabilidades; sobe o ambiente em contêiner e executa a coleção Postman com o Newman |
+| **`cd.yml`** | Push na `main`, tag `v*` ou disparo manual | Testes; **aprovação manual** (environment `aws`); login na AWS por OIDC; `terraform apply` das camadas `10-base` e `20-cluster`; build e push da imagem ao ECR; Job de migração; `kubectl apply -k overlays/aws`; teste de fumaça com o Newman no endereço público |
+| **`destruir-cluster.yml`** | Todo dia às 03:00 (Brasília) ou manual | Remove a aplicação e o balanceador, destrói a camada `20-cluster` e resume o que sobrou cobrando |
+
+- **Sem chave de acesso:** o GitHub emite um token de curta duração e a AWS o troca por credenciais
+  temporárias de um papel restrito à `main` e ao environment `aws`.
+- **Freio de custo:** o deploy automático a cada push na `main` só acontece com a variável do
+  repositório `CD_HABILITADO=true`; o disparo manual sempre funciona.
+- **Segredos do GitHub:** `AWS_ROLE_ARN`, `JWT_CHAVE`, `SEED_SENHA_ADMIN`, `SMTP_USUARIO` e
+  `SMTP_SENHA`.
+
+Como configurar o GitHub e a AWS, rodar o primeiro deploy e desligar tudo:
+[`docs/09-guia-cd-aws.md`](docs/09-guia-cd-aws.md).
 
 ---
 
@@ -428,8 +693,16 @@ AutoMecanic/
 │   └── AutoMecanic.IntegrationTests/ 101 verificações com Testcontainers
 ├── k8s/
 │   ├── base/                         manifestos comuns (Kustomize)
-│   └── overlays/local/               cluster kind, Mailpit, PostgreSQL e teste de carga
-├── docs/                             documentação DDD, relatório de segurança e plano da Fase 2
+│   └── overlays/
+│       ├── local/                    cluster kind, Mailpit, PostgreSQL e teste de carga
+│       └── aws/                      EKS: NLB, imagem do ECR e script de deploy
+├── infra/
+│   ├── 00-bootstrap/                 Terraform: bucket S3 do estado
+│   ├── 10-base/                      Terraform: rede, ECR, RDS, papel OIDC e alarmes de gasto
+│   └── 20-cluster/                   Terraform: cluster EKS
+├── .github/workflows/                ci.yml · cd.yml · destruir-cluster.yml
+├── postman/ · tools/                 coleção das APIs e o gerador dela a partir do OpenAPI
+├── docs/                             documentação DDD, guias, relatório de segurança e plano da Fase 2
 ├── Dockerfile · docker-compose.yml · .env.example
 └── Directory.Build.props · Directory.Packages.props · coverlet.runsettings
 ```
@@ -438,8 +711,27 @@ AutoMecanic/
 
 ## Requisitos atendidos
 
+<details open>
+<summary><b>Fase 2: evolução da aplicação e infraestrutura</b></summary>
+
+- ✅ Clean Code e Clean Architecture, com testes de arquitetura que impedem dependências para fora
+- ✅ Testes automatizados dos fluxos críticos: **598 verificações**, 92,2% de cobertura
+- ✅ Abertura de OS com cliente, veículo, serviços e peças, devolvendo `id` e `numero` — `POST /ordens-servico/recepcao`
+- ✅ Consulta de status da OS — `GET /ordens-servico/{id}/status` e `GET /acompanhamento`
+- ✅ Aprovação e recusa do orçamento pelo cliente — `POST /acompanhamento/orcamento/aprovar` e `/reprovar` (rota pública protegida por número da OS e CPF/CNPJ, em vez de webhook; [decisão](docs/05-arquitetura.md))
+- ✅ Listagem priorizada por situação e antiguidade, com exclusão lógica das OS encerradas — `GET /ordens-servico`
+- ✅ Atualização de status por e-mail, por caixa de saída transacional
+- ✅ Dockerfile e `docker-compose.yml` revisados
+- ✅ Manifestos Kubernetes em [`k8s/`](k8s/): Deployment, Service, ConfigMap, Secret e HPA por CPU e memória
+- ✅ Terraform em [`infra/`](infra/README.md): cluster EKS e banco RDS, com recursos e passo a passo documentados
+- ✅ CI/CD em [`.github/workflows/`](.github/workflows/): build, testes, imagem Docker, deploy do cluster, do banco e dos manifestos
+- ✅ [Collection das APIs](postman/README.md) e Swagger
+- ⬜ Vídeo demonstrativo (até 15 min): link a preencher no topo deste README
+
+</details>
+
 <details>
-<summary><b>Fluxos principais</b></summary>
+<summary><b>Fase 1: fluxos principais</b></summary>
 
 - ✅ Identificação do cliente por CPF/CNPJ — `POST /ordens-servico/recepcao`
 - ✅ Cadastro de veículo (placa, marca, modelo, ano)
